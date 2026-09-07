@@ -99,5 +99,7 @@ schemeApplicationSchema.index({ epicNo: 1 });
 schemeApplicationSchema.index({ mobile: 1 });
 schemeApplicationSchema.index({ schemeName: 1 });
 schemeApplicationSchema.index({ appliedAt: -1 });
+schemeApplicationSchema.index({ assemblyName: 1 });
+schemeApplicationSchema.index({ assemblyName: 1, boothNo: 1 });
 
 module.exports = mongoose.model('SchemeApplication', schemeApplicationSchema);

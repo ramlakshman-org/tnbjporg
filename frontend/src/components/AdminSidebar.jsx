@@ -12,7 +12,8 @@ const AdminSidebar = ({
   admin = {},
   isCollapsed = false,
   onToggleCollapse,
-  onLogout
+  onLogout,
+  isMobileOpen = false,
 }) => {
   const role = admin?.role || 'SUPER_ADMIN';
 
@@ -79,13 +80,12 @@ const AdminSidebar = ({
 
   return (
     <aside
-      className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''}`}
+      className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}
       style={{
         width: isCollapsed ? '68px' : '240px',
         minWidth: isCollapsed ? '68px' : '240px',
         height: '100vh',
         maxHeight: '100vh',
-        position: 'relative',
         top: 0,
         left: 0,
         backgroundColor: '#ffffff',

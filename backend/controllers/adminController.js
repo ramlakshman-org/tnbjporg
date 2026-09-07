@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const SchemeApplication = require('../models/SchemeApplication');
@@ -10,6 +11,18 @@ const { BJP_SCHEMES } = require('../constants/schemes');
 // Escape a string so it can be embedded safely inside a RegExp. Prevents
 // regex-injection / ReDoS from user-supplied filter and search values.
 const escapeRegex = (str) => String(str == null ? '' : str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// GeoJSON canonical names differ from what the DB stores for 3 districts.
+// When a map-click sends e.g. "Nilgiris", map it to "THE NILGIRIS" before querying.
+const GEOJSON_TO_DB_DISTRICT = {
+  'nilgiris':   'THE NILGIRIS',
+  'villupuram': 'VILUPPURAM',
+  'sivagangai': 'SIVAGANGA',
+};
+const toDbDistrict = (name) => {
+  if (!name) return name;
+  return GEOJSON_TO_DB_DISTRICT[name.trim().toLowerCase()] || name.trim();
+};
 
 const resolveSchemeName = (schemeName, schemeId) => {
   const raw = String(schemeName == null ? '' : schemeName).trim();
@@ -32,6 +45,7 @@ const {
   getCollectionForAssembly,
   getDistrictVoterRollCount,
   getAssemblyVoterRollCount,
+  getAllAssemblyVoterCounts,
   getBoothVoterRollCount,
   getStateVoterRollCount
 } = require('../services/jurisdictionService');
@@ -74,11 +88,19 @@ const getAdminScopeQuery = (admin) => {
 // cleared whenever an application status changes so admins see fresh numbers.
 const _statsCache = new Map();
 const STATS_TTL_MS = 5 * 60 * 1000;
+const _mapCache = new Map();
+const MAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const statsCacheKey = (admin, q = {}) => JSON.stringify({
   r: admin.role || '', d: admin.district || '', a: admin.assemblyName || '', b: admin.boothNo || '',
   qd: q.district || '', qa: q.assemblyName || '', qb: q.boothNo || ''
 });
-const invalidateStatsCache = () => _statsCache.clear();
+const invalidateStatsCache = () => { _statsCache.clear(); _mapCache.clear(); _trendsCache.clear(); _coverageCache.clear(); };
+
+const _trendsCache = new Map();
+const _coverageCache = new Map();
+const TRENDS_TTL_MS = 2 * 60 * 1000;
+const COVERAGE_TTL_MS = 2 * 60 * 1000;
+const scopeCacheKey = (admin) => JSON.stringify({ r: admin.role || '', d: admin.district || '', a: admin.assemblyName || '', b: admin.boothNo || '' });
 
 // @desc    Admin Login
 // @route   POST /api/admin/login
@@ -214,24 +236,28 @@ const getAssemblyBoothCredentials = async (req, res) => {
 const getDashboardStats = async (req, res) => {
   try {
     const admin = req.admin;
-    const { district, assemblyName, boothNo } = req.query || {};
+    const { district, assemblyName, boothNo, live } = req.query || {};
 
-    // Serve from the 5-min scope cache when fresh.
+    // Serve from the 5-min scope cache when fresh (bypass with ?live=1).
     const _cacheKey = statsCacheKey(admin, req.query || {});
     const _cached = _statsCache.get(_cacheKey);
-    if (_cached && Date.now() - _cached.at < STATS_TTL_MS) {
+    if (_cached && Date.now() - _cached.at < STATS_TTL_MS && live !== '1') {
       return res.status(200).json(_cached.payload);
     }
 
     const scopeQuery = getAdminScopeQuery(admin);
 
     // Count from WRITE DB: unique enrolled members with scheme applications
-    const [totalApplications, distinctMobiles, totalRegisteredUsers] = await Promise.all([
+    const [totalApplications, distinctMobileCount, totalRegisteredUsers] = await Promise.all([
       SchemeApplication.countDocuments(scopeQuery),
-      SchemeApplication.distinct('mobile', scopeQuery),
+      SchemeApplication.aggregate([
+        { $match: scopeQuery },
+        { $group: { _id: '$mobile' } },
+        { $count: 'total' }
+      ], { allowDiskUse: true }).then(r => r[0]?.total || 0),
       User.countDocuments(scopeQuery)
     ]);
-    const totalVotersRequested = distinctMobiles.length || totalApplications;
+    const totalVotersRequested = distinctMobileCount || totalApplications;
 
     // Count from READ DB: instant from in-memory cache
     let totalVotersInRoll = null;
@@ -610,7 +636,7 @@ const getApplicationsList = async (req, res) => {
 
     const isValidFilterVal = (val) => val && val !== 'undefined' && val !== 'null' && val !== 'all' && String(val).trim() !== '';
 
-    if (isValidFilterVal(district))     appScopeFilter.district     = new RegExp('^' + escapeRegex(district.trim()) + '$', 'i');
+    if (isValidFilterVal(district))     appScopeFilter.district     = new RegExp('^' + escapeRegex(toDbDistrict(district)) + '$', 'i');
     if (isValidFilterVal(assemblyName)) appScopeFilter.assemblyName = new RegExp('^' + escapeRegex(assemblyName.trim()) + '$', 'i');
     if (isValidFilterVal(boothNo))      appScopeFilter.boothNo      = String(boothNo).trim();
     if (isValidFilterVal(status))       appScopeFilter.status       = new RegExp('^' + escapeRegex(status.trim()) + '$', 'i');
@@ -1097,10 +1123,10 @@ const exportApplicationsCsv = async (req, res) => {
     if (admin.role === 'ASSEMBLY_ADMIN')   appScopeFilter.assemblyName = admin.assemblyName;
     if (admin.role === 'BOOTH_ADMIN') { appScopeFilter.assemblyName = admin.assemblyName; appScopeFilter.boothNo = admin.boothNo; }
     const isValidFilterVal = (val) => val && val !== 'undefined' && val !== 'null' && val !== 'all' && String(val).trim() !== '';
-    if (isValidFilterVal(district))     appScopeFilter.district     = district;
-    if (isValidFilterVal(assemblyName)) appScopeFilter.assemblyName = assemblyName;
-    if (isValidFilterVal(boothNo))      appScopeFilter.boothNo      = boothNo;
-    if (isValidFilterVal(status))       appScopeFilter.status        = status;
+    if (isValidFilterVal(district))     appScopeFilter.district     = new RegExp('^' + escapeRegex(toDbDistrict(district)) + '$', 'i');
+    if (isValidFilterVal(assemblyName)) appScopeFilter.assemblyName = new RegExp('^' + escapeRegex(assemblyName.trim()) + '$', 'i');
+    if (isValidFilterVal(boothNo))      appScopeFilter.boothNo      = String(boothNo).trim();
+    if (isValidFilterVal(status))       appScopeFilter.status       = new RegExp('^' + escapeRegex(status.trim()) + '$', 'i');
     const targetScheme = schemeName || req.query.scheme || req.query.schemeId;
     if (isValidFilterVal(targetScheme)) {
       const clean = String(targetScheme).trim();
@@ -1608,8 +1634,341 @@ const getBoothVoterRoll = async (req, res) => {
   }
 };
 
+// ── Map Analytics ──────────────────────────────────────────────────────────
+// Lightweight endpoint for the admin map views. Returns district-level and
+// assembly-level application counts, scoped to the logged-in admin's jurisdiction.
+// Does not include referral data, booth details, or voter roll counts — keeps
+// response fast for map rendering.
+const getMapAnalytics = async (req, res) => {
+  try {
+    const admin = req.admin;
+    const cacheKey = JSON.stringify({ role: admin.role, district: admin.district || null, assembly: admin.assemblyName || null });
+    const cached = _mapCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < MAP_CACHE_TTL_MS) {
+      return res.status(200).json(cached.data);
+    }
+
+    const scopeQuery = getAdminScopeQuery(admin);
+
+    const [districtStats, assemblyStats] = await Promise.all([
+      SchemeApplication.aggregate([
+        { $match: scopeQuery },
+        {
+          $group: {
+            _id: '$district',
+            total: { $sum: 1 },
+            approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $in: ['$status', ['Submitted', 'Pending', 'In Progress', 'Called']] }, 1, 0] } }
+          }
+        },
+        { $sort: { total: -1 } }
+      ], { allowDiskUse: true }),
+
+      SchemeApplication.aggregate([
+        { $match: scopeQuery },
+        {
+          $group: {
+            _id: { district: '$district', assembly: '$assemblyName' },
+            total: { $sum: 1 },
+            approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $in: ['$status', ['Submitted', 'Pending', 'In Progress', 'Called']] }, 1, 0] } }
+          }
+        },
+        { $sort: { total: -1 } }
+      ], { allowDiskUse: true })
+    ]);
+
+    const payload = {
+      success: true,
+      role: admin.role,
+      district: admin.district || null,
+      assemblyName: admin.assemblyName || null,
+      districtStats,
+      assemblyStats
+    };
+    _mapCache.set(cacheKey, { data: payload, ts: Date.now() });
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('[getMapAnalytics Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch map analytics' });
+  }
+};
+
+// @desc    Assembly / booth coverage (registered vs voter roll) scoped to admin
+// @route   GET /api/admin/coverage
+// @access  Private (Admin)
+const getCoverage = async (req, res) => {
+  try {
+    const admin = req.admin;
+    const _cKey = scopeCacheKey(admin);
+    const _cCached = _coverageCache.get(_cKey);
+    if (_cCached && Date.now() - _cCached.at < COVERAGE_TTL_MS) return res.status(200).json(_cCached.payload);
+
+    const isBoothLevel = (admin.role === 'ASSEMBLY_ADMIN' || admin.role === 'BOOTH_ADMIN');
+
+    if (isBoothLevel) {
+      const asmName = admin.assemblyName;
+      if (!asmName) return res.status(400).json({ success: false, message: 'Assembly not set' });
+
+      const [regByBooth, cols] = await Promise.all([
+        SchemeApplication.aggregate([
+          { $match: { assemblyName: new RegExp('^' + escapeRegex(asmName) + '$', 'i') } },
+          { $group: { _id: '$boothNo', count: { $sum: 1 } } }
+        ], { allowDiskUse: true }),
+        getCollectionForAssembly(asmName)
+      ]);
+
+      const regMap = {};
+      regByBooth.forEach(r => { if (r._id) regMap[String(r._id)] = r.count; });
+
+      let rollMap = {};
+      if (cols && cols.length > 0) {
+        const voterDb = await getVoterDbClient();
+        const counts = await voterDb.collection(cols[0]).aggregate([
+          { $group: { _id: '$PART_NO', roll: { $sum: 1 } } }
+        ], { allowDiskUse: true }).toArray();
+        counts.forEach(c => { if (c._id) rollMap[String(c._id)] = c.roll; });
+      }
+
+      const allBooths = new Set([...Object.keys(regMap), ...Object.keys(rollMap)]);
+      let rows = [...allBooths].map(boothNo => {
+        const registered = regMap[boothNo] || 0;
+        const roll = rollMap[boothNo] || 0;
+        const pct = roll > 0 ? parseFloat(((registered / roll) * 100).toFixed(1)) : null;
+        return { boothNo, registered, roll, pct };
+      }).sort((a, b) => parseInt(a.boothNo) - parseInt(b.boothNo));
+
+      if (admin.role === 'BOOTH_ADMIN') {
+        rows = rows.filter(r => String(r.boothNo) === String(admin.boothNo));
+      }
+
+      const boothPayload = { success: true, type: 'booth', assemblyName: asmName, rows };
+      _coverageCache.set(_cKey, { at: Date.now(), payload: boothPayload });
+      return res.status(200).json(boothPayload);
+    } else {
+      const scopeQuery = getAdminScopeQuery(admin);
+
+      const [regByAssembly, assemblies, voterCountMap] = await Promise.all([
+        SchemeApplication.aggregate([
+          { $match: scopeQuery },
+          { $group: { _id: '$assemblyName', count: { $sum: 1 } } }
+        ], { allowDiskUse: true }),
+        getAssemblyMetadata(),
+        getAllAssemblyVoterCounts()
+      ]);
+
+      const regMap = {};
+      regByAssembly.forEach(r => { if (r._id) regMap[r._id.toUpperCase()] = r.count; });
+
+      let filtered = assemblies;
+      if (admin.role === 'DISTRICT_ADMIN' && admin.district) {
+        filtered = assemblies.filter(a => a.district.toUpperCase() === admin.district.toUpperCase());
+      }
+
+      const rows = filtered.map(a => {
+        const registered = regMap[a.assemblyName.toUpperCase()] || 0;
+        const roll = voterCountMap[a.assemblyName.toUpperCase()] || 0;
+        const pct = roll > 0 ? parseFloat(((registered / roll) * 100).toFixed(1)) : null;
+        return { assemblyNo: a.assemblyNo, assemblyName: a.assemblyName, district: a.district, registered, roll, pct };
+      });
+
+      rows.sort((a, b) => (a.pct ?? -1) - (b.pct ?? -1)); // lowest coverage first
+      const assemblyPayload = { success: true, type: 'assembly', rows };
+      _coverageCache.set(_cKey, { at: Date.now(), payload: assemblyPayload });
+      return res.status(200).json(assemblyPayload);
+    }
+  } catch (err) {
+    console.error('[getCoverage Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch coverage data' });
+  }
+};
+
+// @desc    14-day daily registration trend (scoped to admin jurisdiction)
+// @route   GET /api/admin/trends?days=14
+// @access  Private (Admin)
+const getTrends = async (req, res) => {
+  try {
+    const days = Math.min(parseInt(req.query.days) || 14, 90);
+    const _tKey = scopeCacheKey(req.admin) + ':' + days;
+    const _tCached = _trendsCache.get(_tKey);
+    if (_tCached && Date.now() - _tCached.at < TRENDS_TTL_MS) return res.status(200).json(_tCached.payload);
+
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const now = new Date();
+
+    // Start of (days-1) ago in IST
+    const sinceRaw = new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    const sinceIST = new Date(
+      Math.floor((sinceRaw.getTime() + IST_OFFSET_MS) / 86400000) * 86400000 - IST_OFFSET_MS
+    );
+
+    const scopeQuery = getAdminScopeQuery(req.admin);
+
+    const raw = await SchemeApplication.aggregate([
+      { $match: { ...scopeQuery, appliedAt: { $gte: sinceIST } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$appliedAt', timezone: '+05:30' } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ], { allowDiskUse: true });
+
+    const map = {};
+    raw.forEach(r => { map[r._id] = r.count; });
+
+    const trends = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const ist = new Date(d.getTime() + IST_OFFSET_MS);
+      const dateStr = ist.toISOString().slice(0, 10);
+      trends.push({ date: dateStr, count: map[dateStr] || 0 });
+    }
+
+    const payload = { success: true, trends };
+    _trendsCache.set(_tKey, { at: Date.now(), payload });
+    return res.status(200).json(payload);
+  } catch (err) {
+    console.error('[getTrends Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch trends' });
+  }
+};
+
+// @desc    Bulk update status of multiple applications (within admin scope)
+// @route   PUT /api/admin/applications/bulk-status
+// @access  Private (Admin)
+const bulkUpdateApplicationStatus = async (req, res) => {
+  try {
+    const { ids, status, remarks } = req.body;
+    const admin = req.admin;
+
+    const VALID_STATUSES = ['Pending', 'Submitted', 'Processing', 'Completed', 'In Progress', 'Called', 'Verified', 'Approved', 'Rejected'];
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'ids array is required and must not be empty' });
+    }
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+    }
+    if (ids.length > 200) {
+      return res.status(400).json({ success: false, message: 'Cannot bulk-update more than 200 applications at once' });
+    }
+
+    // Build scope filter so admins can only update within their own scope
+    const scopeFilter = getAdminScopeQuery(admin);
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+
+    // Fetch only apps that are in scope (security check)
+    const apps = await SchemeApplication.find({ _id: { $in: objectIds }, ...scopeFilter });
+
+    if (apps.length === 0) {
+      return res.status(403).json({ success: false, message: 'No applications found within your scope' });
+    }
+
+    const updatedBy = `${admin.role} (${admin.username})`;
+    const now = new Date();
+    const historyEntry = {
+      status,
+      remarks: remarks || `Bulk status update by ${updatedBy}`,
+      updatedBy,
+      updatedAt: now
+    };
+
+    // Use bulkWrite for efficiency
+    const bulkOps = apps.map(app => ({
+      updateOne: {
+        filter: { _id: app._id },
+        update: {
+          $set: { status, adminRemarks: remarks || app.adminRemarks },
+          $push: { statusHistory: historyEntry }
+        }
+      }
+    }));
+
+    const result = await SchemeApplication.bulkWrite(bulkOps);
+    invalidateStatsCache();
+
+    return res.status(200).json({
+      success: true,
+      message: `Updated ${result.modifiedCount} application(s) to "${status}"`,
+      modifiedCount: result.modifiedCount,
+      requestedCount: ids.length,
+      skippedCount: ids.length - apps.length
+    });
+  } catch (error) {
+    console.error('[bulkUpdateApplicationStatus Error]:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// Pre-warm stats cache for Super Admin scope so first dashboard load is instant
+const warmStatsCache = async () => {
+  try {
+    const superAdmin = { role: 'SUPER_ADMIN', district: '', assemblyName: '', boothNo: '' };
+    const scopeQuery = {};
+    const _cacheKey = statsCacheKey(superAdmin, {});
+    const [totalApplications, distinctMobileCount, totalRegisteredUsers] = await Promise.all([
+      SchemeApplication.countDocuments(scopeQuery),
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: '$mobile' } }, { $count: 'total' }], { allowDiskUse: true }).then(r => r[0]?.total || 0),
+      User.countDocuments(scopeQuery)
+    ]);
+    const [statusCounts, rawDistrictStats, rawAssemblyStats, rawBoothStats, rawPopularity] = await Promise.all([
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: '$status', count: { $sum: 1 } } }], { allowDiskUse: true }),
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: '$district', totalApps: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } }, pending: { $sum: { $cond: [{ $in: ['$status', ['Submitted', 'Pending', 'In Progress', 'Called']] }, 1, 0] } }, voterIds: { $addToSet: { $ifNull: ['$epicNo', '$mobile'] } } } }, { $project: { _id: 1, totalApps: 1, approved: 1, pending: 1, appliedVoters: { $size: '$voterIds' } } }, { $sort: { totalApps: -1 } }], { allowDiskUse: true }),
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: { district: '$district', assemblyName: '$assemblyName' }, totalApps: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } }, pending: { $sum: { $cond: [{ $in: ['$status', ['Submitted', 'Pending', 'In Progress', 'Called']] }, 1, 0] } }, voterIds: { $addToSet: { $ifNull: ['$epicNo', '$mobile'] } } } }, { $project: { _id: 1, totalApps: 1, approved: 1, pending: 1, appliedVoters: { $size: '$voterIds' } } }, { $sort: { totalApps: -1 } }, { $limit: 50 }], { allowDiskUse: true }),
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: { district: '$district', assemblyName: '$assemblyName', boothNo: '$boothNo' }, totalApps: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } }, pending: { $sum: { $cond: [{ $in: ['$status', ['Submitted', 'Pending', 'In Progress', 'Called']] }, 1, 0] } }, voterIds: { $addToSet: { $ifNull: ['$epicNo', '$mobile'] } } } }, { $project: { _id: 1, totalApps: 1, approved: 1, pending: 1, appliedVoters: { $size: '$voterIds' } } }, { $sort: { totalApps: -1 } }, { $limit: 100 }], { allowDiskUse: true }),
+      SchemeApplication.aggregate([{ $match: scopeQuery }, { $group: { _id: '$schemeName', count: { $sum: 1 }, cluster: { $first: '$clusterName' } } }, { $sort: { count: -1 } }], { allowDiskUse: true })
+    ]);
+    const totalVotersInRoll = await getStateVoterRollCount();
+    const statusMap = {};
+    statusCounts.forEach(s => { if (s._id) statusMap[s._id] = s.count; });
+    const payload = {
+      success: true,
+      stats: {
+        totalApplications, totalVotersRequested: distinctMobileCount || totalApplications,
+        totalRegisteredUsers, totalVotersInRoll,
+        statusBreakdown: statusMap,
+        districtStats: rawDistrictStats, assemblyStats: rawAssemblyStats, boothStats: rawBoothStats,
+        schemePopularity: rawPopularity, topReferrers: []
+      }
+    };
+    _statsCache.set(_cacheKey, { at: Date.now(), payload });
+    console.log('[Warmup] ✅ Stats cache warmed for Super Admin scope');
+  } catch (err) {
+    console.error('[Warmup] ❌ Stats cache warmup failed:', err.message);
+  }
+};
+
+const warmCoverageCache = async () => {
+  try {
+    const superAdmin = { role: 'SUPER_ADMIN', district: '', assemblyName: '', boothNo: '' };
+    const _cKey = scopeCacheKey(superAdmin);
+    const [regByAssembly, assemblies, voterCountMap] = await Promise.all([
+      SchemeApplication.aggregate([{ $match: {} }, { $group: { _id: '$assemblyName', count: { $sum: 1 } } }], { allowDiskUse: true }),
+      getAssemblyMetadata(),
+      getAllAssemblyVoterCounts()
+    ]);
+    const regMap = {};
+    regByAssembly.forEach(r => { if (r._id) regMap[r._id.toUpperCase()] = r.count; });
+    const rows = assemblies.map(a => {
+      const registered = regMap[a.assemblyName.toUpperCase()] || 0;
+      const roll = voterCountMap[a.assemblyName.toUpperCase()] || 0;
+      const pct = roll > 0 ? parseFloat(((registered / roll) * 100).toFixed(1)) : null;
+      return { assemblyNo: a.assemblyNo, assemblyName: a.assemblyName, district: a.district, registered, roll, pct };
+    });
+    rows.sort((a, b) => (a.pct ?? -1) - (b.pct ?? -1));
+    const payload = { success: true, type: 'assembly', rows };
+    _coverageCache.set(_cKey, { at: Date.now(), payload });
+    console.log('[Warmup] ✅ Coverage cache warmed for Super Admin scope');
+  } catch (err) {
+    console.error('[Warmup] ❌ Coverage cache warmup failed:', err.message);
+  }
+};
+
 module.exports = {
   adminLogin,
+  warmStatsCache,
+  warmCoverageCache,
   getAssembliesList,
   getDistrictCredentials,
   getAssemblyCredentials,
@@ -1621,7 +1980,11 @@ module.exports = {
   exportApplicationsExcel,
   getFilterMeta,
   updateApplicationStatus,
+  bulkUpdateApplicationStatus,
   createAdminCredential,
   getAllAdmins,
-  getBoothVoterRoll
+  getBoothVoterRoll,
+  getMapAnalytics,
+  getTrends,
+  getCoverage
 };

@@ -64,6 +64,8 @@ export const ta = {
   "Who can apply?": "யார் விண்ணப்பிக்கலாம்?",
   "How to apply?": "எப்படி விண்ணப்பிப்பது?",
   "Visit Official Website": "அதிகாரப்பூர்வ இணையதளத்தைப் பார்வையிடவும்",
+  "Add this Scheme": "இந்த திட்டத்தை சேர்க்கவும்",
+  "Remove this Scheme": "இந்த திட்டத்தை நீக்கவும்",
   "My Schemes Dashboard": "எனது நலத்திட்டங்கள் டாஷ்போர்டு",
   "My Applied Schemes": "நான் விண்ணப்பித்த நலத்திட்டங்கள்",
   "No schemes applied yet. Select from the available schemes below to apply!": "இதுவரை எந்தத் நலத்திட்டத்திற்கும் விண்ணப்பிக்கவில்லை. கீழே உள்ள நலத்திட்டங்களிலிருந்து தேர்ந்தெடுத்து விண்ணப்பிக்கவும்!",

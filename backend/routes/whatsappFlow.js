@@ -118,9 +118,29 @@ async function loadGlobalImages() {
   return data;
 }
 
-const schemeIconB64 = (s) => (s.waLogo ? urlToBase64(s.waLogo, { width: 200, height: 200, crop: 'fill', quality: 80, format: 'jpg' }) : Promise.resolve(''));
-// Scheme-detail banner uses the SAME ratio as the welcome/register banner (1600x200, 8:1)
-const schemeBannerB64 = (s) => (s.waBanner ? urlToBase64(s.waBanner, { width: 1600, height: 200, crop: 'fill', quality: 80, format: 'jpg' }) : Promise.resolve(''));
+let schemeImgCache = {};
+let schemeImgCacheTs = {};
+const SCHEME_IMG_TTL = 30 * 60 * 1000;
+
+async function cachedSchemeIcon(s) {
+  const key = 'icon_' + s.id;
+  const now = Date.now();
+  if (schemeImgCache[key] !== undefined && now - (schemeImgCacheTs[key] || 0) < SCHEME_IMG_TTL) return schemeImgCache[key];
+  const val = s.waLogo ? await urlToBase64(s.waLogo, { width: 200, height: 200, crop: 'fill', quality: 80, format: 'jpg' }) : '';
+  schemeImgCache[key] = val;
+  schemeImgCacheTs[key] = now;
+  return val;
+}
+
+async function cachedSchemeBanner(s) {
+  const key = 'banner_' + s.id;
+  const now = Date.now();
+  if (schemeImgCache[key] !== undefined && now - (schemeImgCacheTs[key] || 0) < SCHEME_IMG_TTL) return schemeImgCache[key];
+  const val = s.waBanner ? await urlToBase64(s.waBanner, { width: 1600, height: 200, crop: 'fill', quality: 80, format: 'jpg' }) : '';
+  schemeImgCache[key] = val;
+  schemeImgCacheTs[key] = now;
+  return val;
+}
 
 /* ───────── Helpers ───────── */
 function phoneFromToken(token) {
@@ -319,7 +339,7 @@ async function schemeListScreen(screenId, phone, l, { title, body, banner, exclu
   const bannerB64 = banner ? await urlToBase64(banner, { width: 1600, height: 200, crop: 'fill', quality: 80, format: 'jpg' }) : '';
   const items = await Promise.all(
     catalog.slice(0, 30).map(async (s) => {
-      const image = await schemeIconB64(s);
+      const image = await cachedSchemeIcon(s);
       const item = { id: String(s.id), title: (schemeTitle(s, l) || '').slice(0, 30), description: (schemeBenefit(s, l) || '').slice(0, 60) };
       if (image) item.image = image;
       return item;
@@ -333,7 +353,7 @@ async function schemeDetailScreen(screenId, schemeId, l) {
   const phoneNeeded = false; // detail is stateless
   const s = (await getSchemesCatalog()).find((x) => Number(x.id) === Number(schemeId));
   if (!s) return infoScreen({ title: UI.none_title(l), body: L(l, 'Scheme not found.', 'திட்டம் கிடைக்கவில்லை.') });
-  const banner = await schemeBannerB64(s);
+  const banner = await cachedSchemeBanner(s);
   const body =
     `${schemeBenefit(s, l) ? '💡 ' + schemeBenefit(s, l) + '\n\n' : ''}` +
     `${schemeOverview(s, l) || ''}` +
@@ -658,7 +678,7 @@ async function appliedItems(user, l) {
   return Promise.all(apps.slice(0, 30).map(async (a) => {
     const s = catalog.find((x) => Number(x.id) === Number(a.schemeId));
     const item = { id: String(a.schemeId), title: (s ? schemeTitle(s, l) : a.schemeName || 'Scheme').slice(0, 30), description: statusLabel(a.status, l) };
-    if (s) { const img = await schemeIconB64(s); if (img) item.image = img; }
+    if (s) { const img = await cachedSchemeIcon(s); if (img) item.image = img; }
     return item;
   }));
 }

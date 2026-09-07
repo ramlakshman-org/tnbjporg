@@ -1,5 +1,5 @@
 const Scheme = require('../models/Scheme');
-const { isConfigured, uploadSchemeImage, deleteImage, publicIdFromUrl } = require('../services/cloudinaryService');
+const { saveSchemeImage, deleteSchemeImage } = require('../services/localSchemeImageService');
 const { invalidateSchemeCache } = require('./schemeController');
 
 // Fields an admin may set/edit on a scheme.
@@ -58,12 +58,9 @@ const createScheme = async (req, res) => {
 
     // Optional image upload (base64 data URI from the admin form)
     if (imageBase64) {
-      if (!isConfigured()) {
-        return res.status(500).json({ success: false, message: 'Image upload unavailable — Cloudinary is not configured on the server.' });
-      }
-      const { secure_url, public_id } = await uploadSchemeImage(imageBase64, `custom_${nextId}_${slugify(data.name)}`);
-      data.backgroundImage = secure_url;
-      data.imagePublicId = public_id;
+      const { url } = await saveSchemeImage(imageBase64, `custom_${nextId}_${slugify(data.name)}`);
+      data.backgroundImage = url;
+      data.imagePublicId = null;
     }
 
     const scheme = await Scheme.create(data);
@@ -90,17 +87,13 @@ const updateScheme = async (req, res) => {
 
     // Optional new image — replace and remove the previous one.
     if (req.body.imageBase64) {
-      if (!isConfigured()) {
-        return res.status(500).json({ success: false, message: 'Image upload unavailable — Cloudinary is not configured on the server.' });
-      }
-      const oldPublicId = scheme.imagePublicId || publicIdFromUrl(scheme.backgroundImage);
-      const { secure_url, public_id } = await uploadSchemeImage(
+      deleteSchemeImage(scheme.backgroundImage);
+      const { url } = await saveSchemeImage(
         req.body.imageBase64,
         `custom_${numericId}_${slugify(data.name || scheme.name)}`
       );
-      data.backgroundImage = secure_url;
-      data.imagePublicId = public_id;
-      if (oldPublicId && oldPublicId !== public_id) await deleteImage(oldPublicId);
+      data.backgroundImage = url;
+      data.imagePublicId = null;
     }
 
     Object.assign(scheme, data);
@@ -123,10 +116,7 @@ const deleteScheme = async (req, res) => {
     if (!scheme) {
       return res.status(404).json({ success: false, message: 'Scheme not found' });
     }
-    // Remove the Cloudinary image too — use the stored public_id, or derive it
-    // from the image URL (seeded schemes only carry the URL, not the public_id).
-    const publicId = scheme.imagePublicId || publicIdFromUrl(scheme.backgroundImage);
-    if (publicId) await deleteImage(publicId);
+    deleteSchemeImage(scheme.backgroundImage);
 
     await Scheme.deleteOne({ id: numericId });
     invalidateSchemeCache();

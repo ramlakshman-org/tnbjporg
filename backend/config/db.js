@@ -4,7 +4,7 @@ const { MongoClient } = require('mongodb');
 // App Write Database Connection (Mongoose)
 const connectAppDb = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_APP_URL, {
+    const conn = await mongoose.connect(process.env.MONGO_APP_URL, { maxPoolSize: 30,
       dbName: 'bjp_nalam_thittam_db'
     });
     console.log(`[App DB] Connected successfully to Mongoose: ${conn.connection.host}`);
@@ -20,7 +20,7 @@ let voterClient = null;
 
 const getVoterDbClient = async () => {
   if (!voterClient) {
-    voterClient = new MongoClient(process.env.MONGO_VOTER_URL);
+    voterClient = new MongoClient(process.env.MONGO_VOTER_URL, { maxPoolSize: 30 });
     await voterClient.connect();
     console.log('[Voter DB] Native MongoClient connected');
   }

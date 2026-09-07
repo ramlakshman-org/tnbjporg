@@ -214,6 +214,14 @@ const maskMobile = (m) => m ? m.slice(0, 5) + 'XXXXX' : ''
 const formatRichText = (txt, isUserBubble = false) => {
   if (!txt) return ''
   let s = String(txt)
+  // Extract https URLs before escaping so query params with & survive
+  const urls = []
+  s = s.replace(/https?:\/\/[^\s]+/g, (url) => {
+    const i = urls.length
+    urls.push(url)
+    return `\x00URL${i}\x00`
+  })
+  s = s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -224,6 +232,12 @@ const formatRichText = (txt, isUserBubble = false) => {
     .replace(/~(.+?)~/g, '<del>$1</del>')
     .replace(/`([^`]+?)`/g, `<code class="chat-code${isUserBubble ? ' on-user' : ''}">$1</code>`)
     .replace(/\n/g, '<br/>')
+  // Restore URLs as tappable links (display without protocol)
+  s = s.replace(/\x00URL(\d+)\x00/g, (_, i) => {
+    const url = urls[Number(i)]
+    const label = url.replace(/^https?:\/\//, '')
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;opacity:0.9">${label}</a>`
+  })
   return s
 }
 
@@ -746,7 +760,7 @@ const _ARCHIVED_NT_SCHEMES_UNUSED = [
 ]
 
 // ── Scheme Info Modal ─────────────────────────────────────────
-function SchemeInfoModal({ scheme, onClose }) {
+function SchemeInfoModal({ scheme, onClose, isSelected, onToggle }) {
   const { t, getSchemeData } = useLang()
   if (!scheme) return null
   const schData = getSchemeData(scheme)
@@ -871,26 +885,43 @@ function SchemeInfoModal({ scheme, onClose }) {
         </div>
 
         {/* Footer CTA */}
-        {scheme.link && (
-          <div style={{ padding: '0 20px 24px' }}>
+        <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button
+            onClick={() => { onToggle && onToggle(); onClose(); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '13px',
+              background: isSelected ? 'rgba(255,59,48,0.12)' : 'var(--color-signal-mint, #2ecc71)',
+              color: isSelected ? '#ff3b30' : '#fff',
+              border: isSelected ? '1.5px solid rgba(255,59,48,0.35)' : 'none',
+              fontWeight: 700, fontSize: 14,
+              borderRadius: 10, cursor: 'pointer',
+              boxSizing: 'border-box', transition: 'all 0.15s',
+            }}
+          >
+            <i className={`bi ${isSelected ? 'bi-x-circle' : 'bi-plus-circle-fill'}`} />
+            {isSelected ? t('Remove this Scheme') : t('Add this Scheme')}
+          </button>
+          {scheme.link && (
             <a
               href={scheme.link}
               target="_blank"
               rel="noopener noreferrer"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: '100%', padding: '12px',
-                background: 'var(--color-signal-mint, #2ecc71)',
-                color: '#fff', fontWeight: 700, fontSize: 13,
+                width: '100%', padding: '10px',
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: 12,
                 borderRadius: 10, textDecoration: 'none',
+                border: '1px solid rgba(255,255,255,0.1)',
                 boxSizing: 'border-box',
               }}
             >
               <i className="bi bi-box-arrow-up-right" />
               {t('Visit Official Website')}
             </a>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <style>{`
@@ -903,6 +934,62 @@ function SchemeInfoModal({ scheme, onClose }) {
   )
 }
 
+// ── Eligibility Checker Data ──────────────────────────────────
+const ELIGIBILITY_DOCS = [
+  { key: 'aadhaar',     label: 'Aadhaar Card' },
+  { key: 'mobile',      label: 'Mobile linked to Aadhaar' },
+  { key: 'bank',        label: 'Bank Account (with IFSC)' },
+  { key: 'ration',      label: 'Smart Ration Card' },
+  { key: 'voter',       label: 'Voter ID Card' },
+  { key: 'land',        label: 'Land Records (Patta/Chitta)' },
+  { key: 'income',      label: 'Income Certificate' },
+  { key: 'community',   label: 'Community/Caste Certificate' },
+  { key: 'education',   label: 'Educational Certificate' },
+  { key: 'pan',         label: 'PAN Card' },
+  { key: 'photo',       label: 'Passport Photo' },
+  { key: 'fisherman',   label: 'Fisherman ID Card' },
+  { key: 'emis',        label: 'EMIS Student Number' },
+  { key: 'mcp',         label: 'Mother & Child Card (MCP)' },
+  { key: 'birth',       label: 'Girl Child Birth Certificate' },
+  { key: 'business',    label: 'Business Proof (license)' },
+  { key: 'shg',         label: 'SHG Registration Copy' },
+  { key: 'electricity', label: 'Electricity Bill (TANGEDCO)' },
+]
+const SCHEME_DOC_MAP = {
+  1:  ['aadhaar','mobile','bank'],
+  2:  ['aadhaar','mobile'],
+  3:  ['aadhaar'],
+  4:  ['aadhaar','bank','mobile'],
+  5:  ['aadhaar','bank','mobile'],
+  6:  ['aadhaar','photo'],
+  7:  ['emis'],
+  8:  ['ration','aadhaar','mobile'],
+  9:  ['aadhaar','mobile'],
+  10: ['aadhaar','land','bank'],
+  11: ['aadhaar','bank','mcp'],
+  12: ['aadhaar','bank','mobile'],
+  13: ['aadhaar','education','bank'],
+  14: ['aadhaar','education','bank','photo'],
+  15: ['aadhaar','land','bank'],
+  16: ['aadhaar','income','community','education','bank'],
+  17: ['aadhaar','income','community','education'],
+  18: ['aadhaar','income','education','bank'],
+  19: ['aadhaar','voter','land','bank'],
+  20: ['shg','aadhaar','ration','bank'],
+  21: ['birth','aadhaar','pan','photo'],
+  22: ['ration','aadhaar','bank'],
+  23: ['aadhaar','ration','bank','business'],
+  24: ['aadhaar','electricity','bank'],
+  25: ['aadhaar','land','electricity','bank'],
+  26: ['fisherman','aadhaar','bank','land'],
+  27: ['aadhaar','pan','business','bank'],
+  28: ['aadhaar','voter','business','bank'],
+  29: ['aadhaar','ration','income','land','bank'],
+  30: ['aadhaar','pan','community','business','bank'],
+  31: ['aadhaar','land','bank'],
+  32: ['aadhaar','education','community','business','bank'],
+}
+
 // ── Scheme Selection Message ─────────────────────────────────
 function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
   const { t, getSchemeData } = useLang()
@@ -910,9 +997,23 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
   const [selected, setSelected] = useState(new Set())
   const [submitted, setSubmitted] = useState(false)
   const [infoScheme, setInfoScheme] = useState(null)
+  const [showEligibility, setShowEligibility] = useState(false)
+  const [checkedDocs, setCheckedDocs] = useState(new Set())
 
   const NT_SCHEMES = useMergedSchemes(NT_SCHEMES_STATIC, adaptToNtShape)
   const clusters = [...new Set(NT_SCHEMES.map(s => s.cluster))]
+
+  const isEligible = (schemeId) => {
+    const req = SCHEME_DOC_MAP[Number(schemeId)]
+    if (!req) return true
+    return req.every(d => checkedDocs.has(d))
+  }
+  const eligibleSchemes = NT_SCHEMES.filter(s => isEligible(s.id))
+  const toggleDoc = (key) => setCheckedDocs(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   const toggle = (id) => {
     if (submitted || !isLatest) return
@@ -931,7 +1032,14 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
 
   return (
     <div style={{ width: '100%' }}>
-      {infoScheme && <SchemeInfoModal scheme={infoScheme} onClose={() => setInfoScheme(null)} />}
+      {infoScheme && (
+        <SchemeInfoModal
+          scheme={infoScheme}
+          onClose={() => setInfoScheme(null)}
+          isSelected={selected.has(infoScheme.id)}
+          onToggle={() => toggle(infoScheme.id)}
+        />
+      )}
       {/* Header counter */}
       <div style={{
         fontSize: 12, color: 'var(--color-ash)', marginBottom: 10,
@@ -942,6 +1050,81 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
           ? <span style={{ color: 'var(--color-signal-mint)', fontWeight: 600 }}>{t('{count} scheme(s) selected ✓', { count: selected.size })}</span>
           : t('Select one or more schemes you are interested in')}
       </div>
+
+      {/* Eligibility checker toggle */}
+      {isLatest && !submitted && (
+        <button
+          onClick={() => { setShowEligibility(p => !p); setCheckedDocs(new Set()) }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: showEligibility ? 'rgba(255,153,51,0.12)' : 'rgba(46,204,113,0.1)',
+            border: `1px solid ${showEligibility ? 'rgba(255,153,51,0.4)' : 'rgba(46,204,113,0.35)'}`,
+            borderRadius: 20, padding: '6px 14px', marginBottom: 10,
+            color: showEligibility ? '#FF9933' : 'var(--color-signal-mint)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          <i className={`bi ${showEligibility ? 'bi-x-circle' : 'bi-clipboard2-check'}`} />
+          {showEligibility ? t('Show All Schemes') : t('Check My Eligibility First')}
+        </button>
+      )}
+
+      {/* Document checklist panel */}
+      {showEligibility && isLatest && !submitted && (
+        <div style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 12, padding: '14px 14px 10px', marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10, lineHeight: 1.5 }}>
+            {t('Tick documents you have — we\'ll show which schemes you can apply for right now:')}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', marginBottom: 10 }}>
+            {ELIGIBILITY_DOCS.map(doc => (
+              <div
+                key={doc.key}
+                onClick={() => toggleDoc(doc.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
+                  fontSize: 11, color: checkedDocs.has(doc.key) ? 'var(--color-signal-mint)' : 'rgba(255,255,255,0.6)',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{
+                  width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+                  background: checkedDocs.has(doc.key) ? 'var(--color-signal-mint)' : 'rgba(255,255,255,0.1)',
+                  border: `1.5px solid ${checkedDocs.has(doc.key) ? 'var(--color-signal-mint)' : 'rgba(255,255,255,0.25)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+                }}>
+                  {checkedDocs.has(doc.key) && <i className="bi bi-check-lg" style={{ fontSize: 9, color: '#fff' }} />}
+                </div>
+                {t(doc.label)}
+              </div>
+            ))}
+          </div>
+          {checkedDocs.size > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-signal-mint)', marginBottom: eligibleSchemes.length > 0 ? 8 : 0 }}>
+              {t('✓ {count} scheme(s) you qualify for right now!', { count: eligibleSchemes.length })}
+            </div>
+          )}
+          {eligibleSchemes.length > 0 && (
+            <button
+              onClick={() => {
+                setSelected(prev => { const next = new Set(prev); eligibleSchemes.forEach(s => next.add(s.id)); return next })
+                setShowEligibility(false)
+              }}
+              style={{
+                width: '100%', padding: '9px', borderRadius: 8,
+                background: 'var(--color-signal-mint)', color: '#fff',
+                border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              <i className="bi bi-check2-all" />
+              {t('Select all {count} eligible schemes', { count: eligibleSchemes.length })}
+            </button>
+          )}
+        </div>
+      )}
 
       {clusters.map(cluster => (
         <div key={cluster} style={{ marginBottom: 14 }}>
@@ -973,14 +1156,14 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
                 <div
                   key={scheme.id}
                   className="scheme-selection-card"
-                  onClick={() => toggle(scheme.id)}
+                  onClick={() => { if (!submitted && isLatest) setInfoScheme(scheme) }}
                   style={{
                     background: cardBg
                       ? `${usingLogo ? '#ffffff ' : ''}url("${encodeURI(cardBg)}") center / ${bgSize} no-repeat`
                       : (isSelected ? 'rgba(250,93,0,0.08)' : 'var(--color-carbon)'),
                     border: `2px solid ${isSelected ? '#FF9933' : '#e5e5ea'}`,
                     cursor: submitted || !isLatest ? 'default' : 'pointer',
-                    opacity: submitted && !isSelected ? 0.4 : 1,
+                    opacity: (showEligibility && checkedDocs.size > 0 && !isEligible(scheme.id)) ? 0.2 : (submitted && !isSelected ? 0.4 : 1),
                     boxShadow: isSelected ? '0 4px 12px rgba(255,153,51,0.35)' : '0 2px 6px rgba(0,0,0,0.06)'
                   }}
                 >
@@ -3842,6 +4025,7 @@ export default function ChatbotPage() {
         return
       }
       await botSay(`❌ ${err.message || t('EPIC not found in Voter DB. Please check and try again.')}`, 200)
+      await botSay(t('Find your EPIC number: https://electoralsearch.eci.gov.in/'), 400)
     }
   }
 

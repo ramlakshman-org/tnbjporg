@@ -6,21 +6,26 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, Share2
+  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, Share2, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
+import TrendsChart from '../../components/TrendsChart';
+import CoverageTable from '../../components/CoverageTable';
 import AdminSidebar from '../../components/AdminSidebar';
 import BoothPresidentRequestsView from '../../components/BoothPresidentRequestsView';
+import AssemblyMap from '../../components/AssemblyMap';
 
 const DistrictAdminDashboard = () => {
   const { admin, logoutAdmin } = useAuth();
   const BJP_SCHEMES = useBjpSchemes();
   const [subPage, setSubPage] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [statsData, setStatsData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(false);
   const [voters, setVoters] = useState([]);
   const [loadingVoters, setLoadingVoters] = useState(false);
   const [totalVoters, setTotalVoters] = useState(0);
@@ -37,6 +42,11 @@ const DistrictAdminDashboard = () => {
   const [selectedVoterTimeline, setSelectedVoterTimeline] = useState(null);
   const skipFilterResetRef = useRef(false);
 
+  // ── Bulk Status Update ──
+  const [selectedAppIds, setSelectedAppIds] = useState(new Set());
+  const [bulkStatus, setBulkStatus] = useState('Called');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
   // ── Sub-page Stats Pagination ──
   const [assStatsPage, setAssStatsPage] = useState(1);
   const [boothStatsPage, setBoothStatsPage] = useState(1);
@@ -50,14 +60,32 @@ const DistrictAdminDashboard = () => {
     } catch (e) {}
   };
 
+  const getPageRange = () => {
+    const range = [];
+    const delta = 2;
+    const left = Math.max(1, currentPage - delta);
+    const right = Math.min(totalPages, currentPage + delta);
+    if (left > 1) { range.push(1); if (left > 2) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages) { if (right < totalPages - 1) range.push('...'); range.push(totalPages); }
+    return range;
+  };
+
   // Fetch dashboard stats (unfiltered for District Overview)
   const fetchStats = async () => {
     try {
       setLoadingStats(true);
+      setStatsError(false);
       const res = await API.get('/admin/dashboard-stats');
-      if (res.data.success) setStatsData(res.data);
+      if (res.data.success) {
+        setStatsData(res.data);
+      } else {
+        console.error('[fetchStats] API returned success:false', res.data);
+        setStatsError(true);
+      }
     } catch (err) {
-      console.error('Error loading stats:', err);
+      console.error('[fetchStats] Network/auth error:', err?.response?.status, err?.message);
+      setStatsError(true);
     } finally {
       setLoadingStats(false);
     }
@@ -161,6 +189,23 @@ const DistrictAdminDashboard = () => {
     }
   };
 
+  const handleBulkUpdate = async () => {
+    if (selectedAppIds.size === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    try {
+      const res = await API.put('/admin/applications/bulk-status', {
+        ids: [...selectedAppIds],
+        status: bulkStatus,
+        remarks: ''
+      });
+      if (res.data.success) {
+        setSelectedAppIds(new Set());
+        fetchVoters(currentPage);
+      }
+    } catch (err) { console.error('Bulk update failed:', err); }
+    finally { setBulkUpdating(false); }
+  };
+
   const renderPagination = (page, totalItems, itemsPerPage, onPageChange) => {
     const totalP = Math.ceil(totalItems / itemsPerPage);
     if (totalP <= 1) return null;
@@ -224,18 +269,26 @@ const DistrictAdminDashboard = () => {
 
   return (
     <div className="admin-layout">
+      <div
+        className={`admin-sidebar-backdrop ${isMobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
       <AdminSidebar
         activeTab={subPage}
-        onSelectTab={navigateSubPage}
+        onSelectTab={(tab) => { navigateSubPage(tab); setIsMobileSidebarOpen(false); }}
         admin={admin || { role: 'DISTRICT_ADMIN', username: 'District Admin' }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onLogout={logoutAdmin}
+        isMobileOpen={isMobileSidebarOpen}
       />
 
       <div className="admin-main">
         {/* Sticky Topbar */}
         <header className="admin-topbar">
+          <button className="admin-mobile-hamburger" onClick={() => setIsMobileSidebarOpen(o => !o)} aria-label="Open menu">
+            <Menu size={20} />
+          </button>
           <div className="admin-topbar-brand">
             {admin?.district || 'District'} District Admin Dashboard
           </div>
@@ -257,12 +310,13 @@ const DistrictAdminDashboard = () => {
 
       {/* PAGE 1: OVERVIEW DASHBOARD */}
       {subPage === 'dashboard' && (
-        loadingStats ? (
+        (loadingStats || (!statsData && !statsError)) ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', gap: '16px' }}>
             <div style={{ width: '40px', height: '40px', border: '4px solid var(--color-linen)', borderTopColor: 'var(--color-saffron)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: '14px', color: 'var(--color-slate)', fontWeight: '500' }}>Loading district stats for {admin.district}...</div>
+            <div style={{ fontSize: '14px', color: 'var(--color-slate)', fontWeight: '500' }}>Loading district stats for {admin?.district}...</div>
             <div style={{ fontSize: '12px', color: 'var(--color-ash-gray)' }}>This may take a moment on first load</div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
         ) : statsData ? (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <div className="stat-cards-grid">
@@ -275,11 +329,11 @@ const DistrictAdminDashboard = () => {
               </div>
               <div style={{ width: '100%' }}>
                 <div className="stat-number" style={{ color: '#2563eb' }}>
-                  {statsData.overview.totalVotersInRoll != null
+                  {statsData.overview?.totalVotersInRoll != null
                     ? statsData.overview.totalVotersInRoll.toLocaleString()
                     : '—'}
                 </div>
-                <div className="stat-label">Total Voters in {admin.district}</div>
+                <div className="stat-label">Total Voters in {admin?.district}</div>
                 <div className="stat-sub">Electoral Roll (Voter DB)</div>
               </div>
             </div>
@@ -290,7 +344,7 @@ const DistrictAdminDashboard = () => {
                 <Users size={20} />
               </div>
               <div style={{ width: '100%' }}>
-                <div className="stat-number">{statsData.overview.totalVotersRequested}</div>
+                <div className="stat-number">{statsData.overview?.totalVotersRequested ?? 0}</div>
                 <div className="stat-label">Voters Requested Schemes</div>
                 <div className="stat-sub">Enrolled in Program</div>
               </div>
@@ -307,7 +361,7 @@ const DistrictAdminDashboard = () => {
                 <Building size={20} />
               </div>
               <div style={{ width: '100%' }}>
-                <div className="stat-number">{statsData.overview.totalApplications}</div>
+                <div className="stat-number">{statsData.overview?.totalApplications ?? 0}</div>
                 <div className="stat-label">District Applications</div>
                 <div className="stat-sub" style={{ color: 'var(--color-electric-blue)', fontWeight: '500' }}>Click to View Applications →</div>
               </div>
@@ -324,7 +378,7 @@ const DistrictAdminDashboard = () => {
                 <Shield size={20} />
               </div>
               <div style={{ width: '100%' }}>
-                <div className="stat-number" style={{ color: 'var(--color-forest-pulse)' }}>{statsData.overview.statusBreakdown.Approved || 0}</div>
+                <div className="stat-number" style={{ color: 'var(--color-forest-pulse)' }}>{statsData.overview?.statusBreakdown?.Approved || 0}</div>
                 <div className="stat-label">Approved Directives</div>
                 <div className="stat-sub" style={{ color: 'var(--color-forest-pulse)', fontWeight: '500' }}>Click to View Approved →</div>
               </div>
@@ -332,10 +386,24 @@ const DistrictAdminDashboard = () => {
 
           </div>
 
+          <AssemblyMap
+            districtFilter={admin.district}
+            assemblyStats={statsData?.assemblyStats || []}
+            onSelectAssembly={(assembly) => {
+              if (assembly) {
+                setAssemblyFilter(assembly);
+                setBoothFilter('');
+                setStatusFilter('');
+                setSchemeFilter('');
+                navigateSubPage('applications');
+              }
+            }}
+          />
+
           <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-midnight-ink)', margin: 0 }}>
-                Top Scheme Demands in {admin.district}
+                Top Scheme Demands in {admin?.district}
               </h3>
               <span style={{ fontSize: '12px', color: 'var(--color-slate)' }}>Click any scheme to filter applications</span>
             </div>
@@ -367,7 +435,7 @@ const DistrictAdminDashboard = () => {
                       boxSizing: 'border-box',
                       width: '100%',
                       background: bgImg
-                        ? `url("${encodeURI(bgImg)}") center / 100% 100% no-repeat`
+                        ? `url("${encodeURI(bgImg)}") center / cover no-repeat`
                         : '#ffffff'
                     }}
                     onMouseEnter={e => {
@@ -400,6 +468,12 @@ const DistrictAdminDashboard = () => {
             </div>
           </div>
 
+          {/* ── Daily Registration Trend ── */}
+          <TrendsChart days={14} />
+
+          {/* ── Coverage vs Voter Roll ── */}
+          <CoverageTable />
+
           {/* ── Visual Scheme Distribution Pie Chart ── */}
           <SchemePieChart
             schemePopularity={statsData?.schemePopularity || []}
@@ -417,7 +491,6 @@ const DistrictAdminDashboard = () => {
 
 
         </div>
-      </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', gap: '12px' }}>
             <div style={{ fontSize: '32px' }}>⚠️</div>
@@ -558,11 +631,37 @@ const DistrictAdminDashboard = () => {
               )}
             </div>
 
+            {/* ── Bulk Action Bar ── */}
+            {selectedAppIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#FFF3E0', borderRadius: '8px', marginBottom: '10px', flexWrap: 'wrap', border: '1px solid #FFB74D' }}>
+                <span style={{ fontWeight: '700', fontSize: '13px', color: '#E65100' }}>{selectedAppIds.size} application{selectedAppIds.size > 1 ? 's' : ''} selected</span>
+                <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #FFB74D', fontSize: '13px', background: 'white' }}>
+                  {['Pending','Submitted','Processing','In Progress','Called','Verified','Approved','Completed','Rejected'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button onClick={handleBulkUpdate} disabled={bulkUpdating} className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '13px' }}>{bulkUpdating ? 'Updating…' : 'Update Status'}</button>
+                <button onClick={() => setSelectedAppIds(new Set())} className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }}>Clear</button>
+              </div>
+            )}
+
             {/* ─── Table ─── */}
             <div style={{ width: '100%', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--color-linen)', color: 'var(--color-slate)', textAlign: 'left', background: 'var(--color-fog-gray)' }}>
+                    <th style={{ padding: '12px 10px', width: '36px' }}>
+                      <input type="checkbox" title="Select all on this page"
+                        checked={voters.length > 0 && voters.every(v => v.applications.every(a => selectedAppIds.has(a._id)))}
+                        onChange={e => {
+                          const pageIds = voters.flatMap(v => v.applications.map(a => a._id));
+                          setSelectedAppIds(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) pageIds.forEach(id => next.add(id));
+                            else pageIds.forEach(id => next.delete(id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </th>
                     <th style={{ padding: '12px 10px' }}>#</th>
                     <th style={{ padding: '12px 10px' }}>Member &amp; EPIC</th>
                     <th style={{ padding: '12px 10px' }}>Mobile</th>
@@ -578,7 +677,7 @@ const DistrictAdminDashboard = () => {
                     // Skeleton rows while loading
                     Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--color-linen)' }}>
-                        {Array.from({ length: 8 }).map((_, j) => (
+                        {Array.from({ length: 9 }).map((_, j) => (
                           <td key={j} style={{ padding: '14px 10px' }}>
                             <div style={{ height: '14px', borderRadius: '6px', background: 'var(--color-linen)', animation: 'pulse 1.4s ease-in-out infinite', width: j === 0 ? '24px' : j === 1 ? '80%' : j === 2 ? '70%' : '60%' }} />
                           </td>
@@ -587,7 +686,7 @@ const DistrictAdminDashboard = () => {
                     ))
                   ) : voters.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
+                      <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
                         No applications found for {admin.district}.
                       </td>
@@ -596,6 +695,8 @@ const DistrictAdminDashboard = () => {
                     voters.map((voter, idx) => {
                       const latestApp = voter.applications[voter.applications.length - 1];
                       const rowNum = (currentPage - 1) * LIMIT + idx + 1;
+                      const voterAppIds = voter.applications.map(a => a._id);
+                      const allSelected = voterAppIds.length > 0 && voterAppIds.every(id => selectedAppIds.has(id));
                       return (
                         <tr key={voter.epicNo || idx}
                           style={{ borderBottom: '1px solid var(--color-linen)', transition: 'background 0.15s', cursor: 'pointer' }}
@@ -604,6 +705,16 @@ const DistrictAdminDashboard = () => {
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title="Click anywhere on row to view details"
                         >
+                          <td style={{ padding: '12px 10px', width: '36px' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={allSelected} onChange={e => {
+                              setSelectedAppIds(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) voterAppIds.forEach(id => next.add(id));
+                                else voterAppIds.forEach(id => next.delete(id));
+                                return next;
+                              });
+                            }} />
+                          </td>
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>
@@ -700,6 +811,21 @@ const DistrictAdminDashboard = () => {
 
 
       {/* PAGE 3: ASSEMBLY STATS */}
+      {subPage === 'assemblies' && (
+        <AssemblyMap
+          districtFilter={admin.district}
+          assemblyStats={statsData?.assemblyStats || []}
+          onSelectAssembly={(assembly) => {
+            if (assembly) {
+              setAssemblyFilter(assembly);
+              setBoothFilter('');
+              setStatusFilter('');
+              setSchemeFilter('');
+              navigateSubPage('applications');
+            }
+          }}
+        />
+      )}
       {subPage === 'assemblies' && statsData && (
         <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-midnight-ink)', marginBottom: '16px' }}>
@@ -789,7 +915,7 @@ const DistrictAdminDashboard = () => {
       {/* PAGE: REPORTS & EXCEL EXPORT */}
       {subPage === 'reports' && (
         <ReportsView
-          initialDistrict={admin?.district || districtFilter}
+          initialDistrict={admin?.district}
           initialAssembly={assemblyFilter}
           initialBooth={boothFilter}
           initialStatus={statusFilter}

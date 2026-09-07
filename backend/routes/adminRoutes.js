@@ -13,9 +13,13 @@ const {
   exportApplicationsExcel,
   getFilterMeta,
   updateApplicationStatus,
+  bulkUpdateApplicationStatus,
   createAdminCredential,
   getAllAdmins,
-  getBoothVoterRoll
+  getBoothVoterRoll,
+  getMapAnalytics,
+  getTrends,
+  getCoverage
 } = require('../controllers/adminController');
 const {
   getAllSchemesAdmin,
@@ -34,6 +38,9 @@ router.get('/jurisdiction-assembly-credentials', protectAdmin, authorizeRoles('S
 router.get('/assembly-booth-credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAssemblyBoothCredentials);
 
 router.get('/dashboard-stats', protectAdmin, getDashboardStats);
+router.get('/trends', protectAdmin, getTrends);
+router.get('/coverage', protectAdmin, getCoverage);
+router.get('/map-analytics', protectAdmin, getMapAnalytics);
 router.get('/filter-meta', protectAdmin, getFilterMeta);
 router.get('/member-referrals', protectAdmin, getMemberReferrals);
 router.get('/applications', protectAdmin, getApplicationsList);
@@ -41,6 +48,7 @@ router.get('/booth-voter-roll', protectAdmin, getBoothVoterRoll);
 router.get('/export-csv', protectAdmin, exportApplicationsCsv);
 router.get('/export-excel', protectAdmin, exportApplicationsExcel);
 router.put('/applications/:id/status', protectAdmin, updateApplicationStatus);
+router.put('/applications/bulk-status', protectAdmin, bulkUpdateApplicationStatus);
 router.post('/create-credential', protectAdmin, authorizeRoles('SUPER_ADMIN'), createAdminCredential);
 router.get('/credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllAdmins);
 

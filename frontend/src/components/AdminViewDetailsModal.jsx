@@ -46,30 +46,20 @@ const AdminViewDetailsModal = ({ application, onClose, onUpdateStatus, onOpenCal
       zIndex: 1000,
       padding: '20px'
     }}>
-      <div className="campsite-card" style={{
-        maxWidth: '680px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        padding: '28px',
-        background: 'var(--color-paper-white)',
-        borderRadius: '16px',
-        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
-        boxSizing: 'border-box'
-      }}>
+      <div className="campsite-card app-detail-modal">
         
         {/* Modal Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-linen)', paddingBottom: '16px', marginBottom: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="tag-pill tag-sunlit" style={{ fontSize: '11px' }}>APPLICATION DETAILS</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', borderBottom: '1px solid var(--color-linen)', paddingBottom: '16px', marginBottom: '20px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+              <span className="tag-pill tag-sunlit" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>APPLICATION DETAILS</span>
               <StatusBadge status={currentStatus} />
             </div>
-            <h2 className="text-heading" style={{ fontSize: '20px', margin: '4px 0 0' }}>
+            <h2 className="text-heading" style={{ fontSize: '18px', margin: '4px 0 0', lineHeight: '1.3' }}>
               Member Scheme Request Profile
             </h2>
           </div>
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px', borderRadius: '9999px' }}>
+          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px', borderRadius: '9999px', flexShrink: 0 }}>
             <X size={18} />
           </button>
         </div>
@@ -140,7 +130,7 @@ const AdminViewDetailsModal = ({ application, onClose, onUpdateStatus, onOpenCal
             <FileText size={14} color="var(--color-campfire-orange)" /> Update Application Status & Notes
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+          <div className="app-detail-action-grid">
             <div>
               <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-midnight-ink)', display: 'block', marginBottom: '6px' }}>
                 Update Request Status

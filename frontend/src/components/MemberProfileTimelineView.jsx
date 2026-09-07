@@ -240,7 +240,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
     <div style={{ width: '100%', boxSizing: 'border-box' }}>
       
       {/* Top Back Navigation Bar */}
-      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="profile-top-bar">
         <button
           onClick={onBack}
           className="btn btn-ghost"
@@ -256,7 +256,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
           className="btn btn-filled"
           style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700', borderRadius: '9999px', background: 'var(--color-midnight-ink)' }}
         >
-          <PhoneCall size={16} /> Call Voter ({mobile})
+          <PhoneCall size={16} /> Call Voter<span className="call-voter-number"> ({mobile})</span>
         </button>
       </div>
 
@@ -267,13 +267,13 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
       )}
 
       {/* Main Full Page Card */}
-      <div className="campsite-card" style={{ width: '100%', padding: '28px', boxSizing: 'border-box', marginBottom: '30px' }}>
+      <div className="campsite-card profile-main-card">
         
         {/* Header Profile Section */}
         <div style={{ borderBottom: '1px solid var(--color-linen)', paddingBottom: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <div className="profile-pills-row">
                 <span className="tag-pill tag-sunlit" style={{ fontSize: '11px' }}>MEMBER PROFILE PAGE</span>
                 <span className="tag-pill tag-active" style={{ fontSize: '11px' }}>{applications.length} Schemes Applied</span>
                 <span className="tag-pill tag-muted" style={{ fontSize: '11px', background: 'var(--color-sunlit-cream)', color: 'var(--color-ember-brown)', fontWeight: '700' }}>
@@ -302,7 +302,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
         </div>
 
         {/* 2-Column Full Page Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(440px, 1.8fr)', gap: '24px', boxSizing: 'border-box' }}>
+        <div className="profile-view-grid">
           
           {/* Left Column: Applied BJP Schemes Selector */}
           <div>

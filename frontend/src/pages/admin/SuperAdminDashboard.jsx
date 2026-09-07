@@ -6,14 +6,17 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, PlusCircle, Search, LogIn, Eye, Award, Share2, ChevronRight, FileText
+  Shield, Users, Building, PhoneCall, RefreshCw, PlusCircle, Search, LogIn, Eye, Award, Share2, ChevronRight, FileText, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
+import TrendsChart from '../../components/TrendsChart';
+import CoverageTable from '../../components/CoverageTable';
 import AdminSidebar from '../../components/AdminSidebar';
 import BoothPresidentRequestsView from '../../components/BoothPresidentRequestsView';
 import SchemesManagementView from '../../components/SchemesManagementView';
 import FlowImagesView from '../../components/FlowImagesView';
+import TnDistrictMap from '../../components/TnDistrictMap';
 
 
 
@@ -24,6 +27,7 @@ const SuperAdminDashboard = () => {
   const BJP_SCHEMES = useBjpSchemes();
   const [subPage, setSubPage] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
 
   // ── Stats ──
@@ -78,6 +82,11 @@ const SuperAdminDashboard = () => {
 
   const [selectedVoterTimeline, setSelectedVoterTimeline] = useState(null);
   const skipFilterResetRef = useRef(false);
+
+  // ── Bulk Status Update ──
+  const [selectedAppIds, setSelectedAppIds] = useState(new Set());
+  const [bulkStatus, setBulkStatus] = useState('Called');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // ── New Admin Form ──
   const [newAdminForm, setNewAdminForm] = useState({
@@ -306,6 +315,23 @@ const SuperAdminDashboard = () => {
         String(a.passcode || '').toLowerCase().includes(_assQ))
     : assemblyCredentials;
 
+  const handleBulkUpdate = async () => {
+    if (selectedAppIds.size === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    try {
+      const res = await API.put('/admin/applications/bulk-status', {
+        ids: [...selectedAppIds],
+        status: bulkStatus,
+        remarks: ''
+      });
+      if (res.data.success) {
+        setSelectedAppIds(new Set());
+        fetchVoters(currentPage);
+      }
+    } catch (err) { console.error('Bulk update failed:', err); }
+    finally { setBulkUpdating(false); }
+  };
+
   const getPageRange = () => {
     const range = [];
     const delta = 2;
@@ -382,18 +408,26 @@ const SuperAdminDashboard = () => {
 
   return (
     <div className="admin-layout">
+      <div
+        className={`admin-sidebar-backdrop ${isMobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
       <AdminSidebar
         activeTab={subPage}
-        onSelectTab={navigateSubPage}
+        onSelectTab={(tab) => { navigateSubPage(tab); setIsMobileSidebarOpen(false); }}
         admin={admin || { role: 'SUPER_ADMIN', username: 'Super Admin' }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onLogout={logoutAdmin}
+        isMobileOpen={isMobileSidebarOpen}
       />
 
       <div className="admin-main">
         {/* Sticky Topbar */}
         <header className="admin-topbar">
+          <button className="admin-mobile-hamburger" onClick={() => setIsMobileSidebarOpen(o => !o)} aria-label="Open menu">
+            <Menu size={20} />
+          </button>
           <div className="admin-topbar-brand">
             Statewide Super Admin Control Portal
           </div>
@@ -437,8 +471,8 @@ const SuperAdminDashboard = () => {
                 </div>
                 <div style={{ width: '100%' }}>
                   <div className="stat-number" style={{ color: '#2563eb' }}>
-                    {statsData.overview.totalVotersInRoll != null
-                      ? statsData.overview.totalVotersInRoll.toLocaleString()
+                    {statsData.overview?.totalVotersInRoll != null
+                      ? statsData.overview?.totalVotersInRoll.toLocaleString()
                       : '—'}
                   </div>
                   <div className="stat-label">Total Voters in Roll</div>
@@ -510,6 +544,19 @@ const SuperAdminDashboard = () => {
 
             </div>
 
+            <TnDistrictMap
+              onSelectDistrict={(district) => {
+                if (district) {
+                  setDistrictFilter(district);
+                  setAssemblyFilter('');
+                  setBoothFilter('');
+                  setStatusFilter('');
+                  setSchemeFilter('');
+                  navigateSubPage('applications');
+                }
+              }}
+            />
+
             {/* ── Top Applied BJP Schemes ── */}
             <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -546,7 +593,7 @@ const SuperAdminDashboard = () => {
                         boxSizing: 'border-box',
                         width: '100%',
                         background: bgImg
-                          ? `url("${encodeURI(bgImg)}") center / 100% 100% no-repeat`
+                          ? `url("${encodeURI(bgImg)}") center / cover no-repeat`
                           : '#ffffff'
                       }}
                       onMouseEnter={e => {
@@ -578,6 +625,12 @@ const SuperAdminDashboard = () => {
                 })}
               </div>
             </div>
+
+            {/* ── Daily Registration Trend ── */}
+            <TrendsChart days={14} />
+
+            {/* ── Coverage vs Voter Roll ── */}
+            <CoverageTable />
 
             {/* ── Visual Scheme Distribution Pie Chart ── */}
             <SchemePieChart
@@ -751,11 +804,37 @@ const SuperAdminDashboard = () => {
               )}
             </div>
 
+            {/* ── Bulk Action Bar ── */}
+            {selectedAppIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#FFF3E0', borderRadius: '8px', marginBottom: '10px', flexWrap: 'wrap', border: '1px solid #FFB74D' }}>
+                <span style={{ fontWeight: '700', fontSize: '13px', color: '#E65100' }}>{selectedAppIds.size} application{selectedAppIds.size > 1 ? 's' : ''} selected</span>
+                <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #FFB74D', fontSize: '13px', background: 'white' }}>
+                  {['Pending','Submitted','Processing','In Progress','Called','Verified','Approved','Completed','Rejected'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button onClick={handleBulkUpdate} disabled={bulkUpdating} className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '13px' }}>{bulkUpdating ? 'Updating…' : 'Update Status'}</button>
+                <button onClick={() => setSelectedAppIds(new Set())} className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }}>Clear</button>
+              </div>
+            )}
+
             {/* ── Table ── */}
             <div style={{ width: '100%', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--color-linen)', color: 'var(--color-slate)', textAlign: 'left', background: 'var(--color-fog-gray)' }}>
+                    <th style={{ padding: '12px 10px', width: '36px' }}>
+                      <input type="checkbox" title="Select all on this page"
+                        checked={voters.length > 0 && voters.every(v => v.applications.every(a => selectedAppIds.has(a._id)))}
+                        onChange={e => {
+                          const pageIds = voters.flatMap(v => v.applications.map(a => a._id));
+                          setSelectedAppIds(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) pageIds.forEach(id => next.add(id));
+                            else pageIds.forEach(id => next.delete(id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </th>
                     <th style={{ padding: '12px 10px' }}>#</th>
                     <th style={{ padding: '12px 10px' }}>Member &amp; EPIC</th>
                     <th style={{ padding: '12px 10px' }}>Mobile</th>
@@ -770,7 +849,7 @@ const SuperAdminDashboard = () => {
                   {loadingVoters ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--color-linen)' }}>
-                        {Array.from({ length: 8 }).map((_, j) => (
+                        {Array.from({ length: 9 }).map((_, j) => (
                           <td key={j} style={{ padding: '14px 10px' }}>
                             <div style={{ height: '14px', borderRadius: '6px', background: 'var(--color-linen)', animation: 'pulse 1.4s ease-in-out infinite', width: j === 0 ? '24px' : j === 1 ? '80%' : '60%' }} />
                           </td>
@@ -779,7 +858,7 @@ const SuperAdminDashboard = () => {
                     ))
                   ) : voters.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
+                      <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
                         No member applications found matching criteria.
                       </td>
@@ -788,6 +867,8 @@ const SuperAdminDashboard = () => {
                     voters.map((voter, idx) => {
                       const latestApp = voter.applications[voter.applications.length - 1];
                       const rowNum = (currentPage - 1) * LIMIT + idx + 1;
+                      const voterAppIds = voter.applications.map(a => a._id);
+                      const allSelected = voterAppIds.length > 0 && voterAppIds.every(id => selectedAppIds.has(id));
                       return (
                         <tr key={voter.epicNo || idx}
                           style={{ borderBottom: '1px solid var(--color-linen)', transition: 'background 0.15s', cursor: 'pointer' }}
@@ -796,6 +877,16 @@ const SuperAdminDashboard = () => {
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title="Click anywhere on row to view details"
                         >
+                          <td style={{ padding: '12px 10px', width: '36px' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={allSelected} onChange={e => {
+                              setSelectedAppIds(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) voterAppIds.forEach(id => next.add(id));
+                                else voterAppIds.forEach(id => next.delete(id));
+                                return next;
+                              });
+                            }} />
+                          </td>
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>
@@ -1080,6 +1171,20 @@ const SuperAdminDashboard = () => {
       {/* ══════════════════════════════════════════ */}
       {/* PAGE 4: DISTRICT STATS                    */}
       {/* ══════════════════════════════════════════ */}
+      {(subPage === 'districts' || subPage === 'districtStats') && (
+        <TnDistrictMap
+          onSelectDistrict={(district) => {
+            if (district) {
+              setDistrictFilter(district);
+              setAssemblyFilter('');
+              setBoothFilter('');
+              setStatusFilter('');
+              setSchemeFilter('');
+              navigateSubPage('applications');
+            }
+          }}
+        />
+      )}
       {(subPage === 'districts' || subPage === 'districtStats') && (
         loadingStats ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', gap: '16px' }}>

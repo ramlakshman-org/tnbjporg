@@ -6,12 +6,15 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, FileText, Share2
+  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, FileText, Share2, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
+import TrendsChart from '../../components/TrendsChart';
+import CoverageTable from '../../components/CoverageTable';
 import AdminSidebar from '../../components/AdminSidebar';
 import BoothPresidentRequestsView from '../../components/BoothPresidentRequestsView';
+import SingleAssemblyMap from '../../components/SingleAssemblyMap';
 
 const LIMIT = 20;
 
@@ -20,11 +23,13 @@ const AssemblyAdminDashboard = () => {
   const BJP_SCHEMES = useBjpSchemes();
   const [subPage, setSubPage] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
 
   // ── Dashboard stats ──
   const [statsData, setStatsData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(false);
 
   // ── Paginated voters (applications) ──
   const [voters, setVoters] = useState([]);
@@ -44,6 +49,11 @@ const AssemblyAdminDashboard = () => {
   const [selectedVoterTimeline, setSelectedVoterTimeline] = useState(null);
   const [boothStatsPage, setBoothStatsPage] = useState(1);
 
+  // ── Bulk Status Update ──
+  const [selectedAppIds, setSelectedAppIds] = useState(new Set());
+  const [bulkStatus, setBulkStatus] = useState('Called');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
   const navigateSubPage = (pageKey) => {
     setSubPage(pageKey);
     setSelectedVoterTimeline(null);
@@ -54,10 +64,17 @@ const AssemblyAdminDashboard = () => {
   const fetchStats = async () => {
     try {
       setLoadingStats(true);
+      setStatsError(false);
       const res = await API.get('/admin/dashboard-stats');
-      if (res.data.success) setStatsData(res.data);
+      if (res.data.success) {
+        setStatsData(res.data);
+      } else {
+        console.error('[fetchStats] API returned success:false', res.data);
+        setStatsError(true);
+      }
     } catch (err) {
-      console.error('Error loading stats:', err);
+      console.error('[fetchStats] Network/auth error:', err?.response?.status, err?.message);
+      setStatsError(true);
     } finally {
       setLoadingStats(false);
     }
@@ -125,6 +142,49 @@ const AssemblyAdminDashboard = () => {
     }
   };
 
+  const handleBulkUpdate = async () => {
+    if (selectedAppIds.size === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    try {
+      const res = await API.put('/admin/applications/bulk-status', {
+        ids: [...selectedAppIds],
+        status: bulkStatus,
+        remarks: ''
+      });
+      if (res.data.success) {
+        setSelectedAppIds(new Set());
+        fetchVoters(currentPage);
+      }
+    } catch (err) { console.error('Bulk update failed:', err); }
+    finally { setBulkUpdating(false); }
+  };
+
+  const renderPagination = (page, totalItems, itemsPerPage, onPageChange) => {
+    const totalP = Math.ceil(totalItems / itemsPerPage);
+    if (totalP <= 1) return null;
+    const startItem = (page - 1) * itemsPerPage + 1;
+    const endItem = Math.min(page * itemsPerPage, totalItems);
+    const range = [];
+    const delta = 2;
+    const left = Math.max(1, page - delta);
+    const right = Math.min(totalP, page + delta);
+    if (left > 1) { range.push(1); if (left > 2) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalP) { if (right < totalP - 1) range.push('...'); range.push(totalP); }
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--color-linen)', fontSize: '13px', color: 'var(--color-slate)' }}>
+        <div>Showing <strong>{startItem}</strong> – <strong>{endItem}</strong> of <strong>{totalItems}</strong> entries</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => onPageChange(page - 1)} disabled={page === 1} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: '12px', opacity: page === 1 ? 0.4 : 1 }}>← Prev</button>
+          {range.map((p, idx) => (
+            <button key={idx} disabled={p === '...'} onClick={() => typeof p === 'number' && onPageChange(p)} className={`btn ${p === page ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 10px', fontSize: '12px', fontWeight: p === page ? '700' : '500', minWidth: '32px' }}>{p}</button>
+          ))}
+          <button onClick={() => onPageChange(page + 1)} disabled={page === totalP} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: '12px', opacity: page === totalP ? 0.4 : 1 }}>Next →</button>
+        </div>
+      </div>
+    );
+  };
+
   // Page range for pagination pills
   const getPageRange = () => {
     const range = [];
@@ -139,18 +199,26 @@ const AssemblyAdminDashboard = () => {
 
   return (
     <div className="admin-layout">
+      <div
+        className={`admin-sidebar-backdrop ${isMobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
       <AdminSidebar
         activeTab={subPage}
-        onSelectTab={navigateSubPage}
+        onSelectTab={(tab) => { navigateSubPage(tab); setIsMobileSidebarOpen(false); }}
         admin={admin || { role: 'ASSEMBLY_ADMIN', username: 'Assembly Admin' }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onLogout={logoutAdmin}
+        isMobileOpen={isMobileSidebarOpen}
       />
 
       <div className="admin-main">
         {/* Sticky Topbar */}
         <header className="admin-topbar">
+          <button className="admin-mobile-hamburger" onClick={() => setIsMobileSidebarOpen(o => !o)} aria-label="Open menu">
+            <Menu size={20} />
+          </button>
           <div className="admin-topbar-brand">
             {admin?.assemblyName || 'Assembly'} Constituency Dashboard
           </div>
@@ -174,10 +242,10 @@ const AssemblyAdminDashboard = () => {
       {/* PAGE 1: OVERVIEW DASHBOARD                */}
       {/* ══════════════════════════════════════════ */}
       {subPage === 'dashboard' && (
-        loadingStats ? (
+        (loadingStats || (!statsData && !statsError)) ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', gap: '16px' }}>
             <div style={{ width: '40px', height: '40px', border: '4px solid var(--color-linen)', borderTopColor: 'var(--color-saffron)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: '14px', color: 'var(--color-slate)', fontWeight: '500' }}>Loading stats for {admin.assemblyName}...</div>
+            <div style={{ fontSize: '14px', color: 'var(--color-slate)', fontWeight: '500' }}>Loading stats for {admin?.assemblyName}...</div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : statsData ? (
@@ -194,8 +262,8 @@ const AssemblyAdminDashboard = () => {
                 </div>
                 <div style={{ width: '100%' }}>
                   <div className="stat-number" style={{ color: '#2563eb' }}>
-                    {statsData.overview.totalVotersInRoll != null
-                      ? statsData.overview.totalVotersInRoll.toLocaleString()
+                    {statsData.overview?.totalVotersInRoll != null
+                      ? statsData.overview?.totalVotersInRoll.toLocaleString()
                       : '—'}
                   </div>
                   <div className="stat-label">Total Voters in {admin.assemblyName}</div>
@@ -253,6 +321,11 @@ const AssemblyAdminDashboard = () => {
             </div>
 
 
+            <SingleAssemblyMap
+              assemblyName={admin.assemblyName}
+              statsData={statsData}
+            />
+
             {/* ── Scheme Popularity ── */}
             <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -289,7 +362,7 @@ const AssemblyAdminDashboard = () => {
                         boxSizing: 'border-box',
                         width: '100%',
                         background: bgImg
-                          ? `url("${encodeURI(bgImg)}") center / 100% 100% no-repeat`
+                          ? `url("${encodeURI(bgImg)}") center / cover no-repeat`
                           : '#ffffff'
                       }}
                       onMouseEnter={e => {
@@ -327,6 +400,12 @@ const AssemblyAdminDashboard = () => {
                 })}
               </div>
             </div>
+
+            {/* ── Daily Registration Trend ── */}
+            <TrendsChart days={14} />
+
+            {/* ── Coverage vs Voter Roll ── */}
+            <CoverageTable />
 
             {/* ── Visual Scheme Distribution Pie Chart ── */}
             <SchemePieChart
@@ -455,11 +534,37 @@ const AssemblyAdminDashboard = () => {
               )}
             </div>
 
+            {/* ── Bulk Action Bar ── */}
+            {selectedAppIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#FFF3E0', borderRadius: '8px', marginBottom: '10px', flexWrap: 'wrap', border: '1px solid #FFB74D' }}>
+                <span style={{ fontWeight: '700', fontSize: '13px', color: '#E65100' }}>{selectedAppIds.size} application{selectedAppIds.size > 1 ? 's' : ''} selected</span>
+                <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #FFB74D', fontSize: '13px', background: 'white' }}>
+                  {['Pending','Submitted','Processing','In Progress','Called','Verified','Approved','Completed','Rejected'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button onClick={handleBulkUpdate} disabled={bulkUpdating} className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '13px' }}>{bulkUpdating ? 'Updating…' : 'Update Status'}</button>
+                <button onClick={() => setSelectedAppIds(new Set())} className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }}>Clear</button>
+              </div>
+            )}
+
             {/* ── Table ── */}
             <div style={{ width: '100%', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--color-linen)', color: 'var(--color-slate)', textAlign: 'left', background: 'var(--color-fog-gray)' }}>
+                    <th style={{ padding: '12px 10px', width: '36px' }}>
+                      <input type="checkbox" title="Select all on this page"
+                        checked={voters.length > 0 && voters.every(v => v.applications.every(a => selectedAppIds.has(a._id)))}
+                        onChange={e => {
+                          const pageIds = voters.flatMap(v => v.applications.map(a => a._id));
+                          setSelectedAppIds(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) pageIds.forEach(id => next.add(id));
+                            else pageIds.forEach(id => next.delete(id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </th>
                     <th style={{ padding: '12px 10px' }}>#</th>
                     <th style={{ padding: '12px 10px' }}>Member &amp; EPIC</th>
                     <th style={{ padding: '12px 10px' }}>Mobile</th>
@@ -474,7 +579,7 @@ const AssemblyAdminDashboard = () => {
                   {loadingVoters ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--color-linen)' }}>
-                        {Array.from({ length: 8 }).map((_, j) => (
+                        {Array.from({ length: 9 }).map((_, j) => (
                           <td key={j} style={{ padding: '14px 10px' }}>
                             <div style={{ height: '14px', borderRadius: '6px', background: 'var(--color-linen)', animation: 'pulse 1.4s ease-in-out infinite', width: j === 0 ? '24px' : j === 1 ? '80%' : '60%' }} />
                           </td>
@@ -483,7 +588,7 @@ const AssemblyAdminDashboard = () => {
                     ))
                   ) : voters.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
+                      <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-slate)' }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
                         No applications found for {admin.assemblyName}{boothFilter ? ` — Booth ${boothFilter}` : ''}.
                       </td>
@@ -492,6 +597,8 @@ const AssemblyAdminDashboard = () => {
                     voters.map((voter, idx) => {
                       const latestApp = voter.applications[voter.applications.length - 1];
                       const rowNum = (currentPage - 1) * LIMIT + idx + 1;
+                      const voterAppIds = voter.applications.map(a => a._id);
+                      const allSelected = voterAppIds.length > 0 && voterAppIds.every(id => selectedAppIds.has(id));
                       return (
                         <tr key={voter.epicNo || idx}
                           style={{ borderBottom: '1px solid var(--color-linen)', transition: 'background 0.15s', cursor: 'pointer' }}
@@ -500,6 +607,16 @@ const AssemblyAdminDashboard = () => {
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title="Click anywhere on row to view details"
                         >
+                          <td style={{ padding: '12px 10px', width: '36px' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={allSelected} onChange={e => {
+                              setSelectedAppIds(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) voterAppIds.forEach(id => next.add(id));
+                                else voterAppIds.forEach(id => next.delete(id));
+                                return next;
+                              });
+                            }} />
+                          </td>
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>

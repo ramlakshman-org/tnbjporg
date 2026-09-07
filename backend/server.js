@@ -55,7 +55,7 @@ const ALLOWED_ORIGINS = [
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
+    return callback(null, false);
   },
   credentials: true
 }));
@@ -263,7 +263,7 @@ const startServer = async () => {
     .then(() => console.log('[Seed] WhatsApp flow-image keys ensured'))
     .catch((err) => console.warn('[Seed] flow-image keys skipped:', err.message));
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`====================================================`);
     console.log(` BJP Nalam Thittam Backend API Server Running `);
     console.log(` Port: http://localhost:${PORT}`);
@@ -273,8 +273,12 @@ const startServer = async () => {
   // Warm up jurisdiction metadata cache in background (counts all 233 assembly collections)
   // This runs ONCE after server starts so the first admin dashboard request is instant
   console.log('[Warmup] Starting jurisdiction metadata + voter count cache in background...');
+  const { warmStatsCache, warmCoverageCache } = require('./controllers/adminController');
   getAssemblyMetadata()
-    .then(() => console.log('[Warmup] ✅ Jurisdiction cache ready — all voter roll counts cached!'))
+    .then(() => {
+      console.log('[Warmup] ✅ Jurisdiction cache ready — all voter roll counts cached!');
+      return Promise.all([warmStatsCache(), warmCoverageCache()]);
+    })
     .catch(err => console.error('[Warmup] ❌ Cache warmup failed:', err.message));
 };
 
