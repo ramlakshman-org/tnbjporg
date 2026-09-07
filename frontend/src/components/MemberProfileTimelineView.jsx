@@ -353,31 +353,36 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
                   Member Referral Link
                 </div>
                 <span className="tag-pill tag-sunlit" style={{ fontSize: '11px', fontWeight: '700' }}>
-                  {referralCode || epicNo}
+                  {referralCode || '—'}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={`${window.location.origin}/r/${referralCode || epicNo}`}
-                  className="form-control"
-                  style={{ fontSize: '11px', padding: '6px 8px', fontFamily: 'var(--font-ui-monospace)', background: '#fff' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = `${window.location.origin}/r/${referralCode || epicNo}`;
-                    navigator.clipboard.writeText(link);
-                    setToastMsg('Referral link copied to clipboard!');
-                    setTimeout(() => setToastMsg(''), 3000);
-                  }}
-                  className="btn btn-ghost"
-                  style={{ padding: '6px 10px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Copy size={13} /> Copy Link
-                </button>
-              </div>
+              {referralCode ? (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/r/${referralCode}`}
+                    className="form-control"
+                    style={{ fontSize: '11px', padding: '6px 8px', fontFamily: 'var(--font-ui-monospace)', background: '#fff' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/r/${referralCode}`);
+                      setToastMsg('Referral link copied to clipboard!');
+                      setTimeout(() => setToastMsg(''), 3000);
+                    }}
+                    className="btn btn-ghost"
+                    style={{ padding: '6px 10px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Copy size={13} /> Copy Link
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: '#b45309', background: '#fef3c7', padding: '8px 10px', borderRadius: '6px' }}>
+                  ⚠️ No referral code on this member's record. They may have registered before the referral system was active.
+                </div>
+              )}
             </div>
 
             {/* Referrals Section inside Left Column */}

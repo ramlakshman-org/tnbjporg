@@ -121,17 +121,9 @@ const getReferralParams = () => {
     if (/^(?:NT-[0-9A-Z]{4,16}|BJP-[0-9A-Z]+-[0-9A-Z]+)$/.test(ref)) {
       return { ref }
     }
-    // localStorage fallback — valid for 24 hours
-    const stored = localStorage.getItem('bjp_referral')
-    if (stored) {
-      const data = JSON.parse(stored)
-      if (data && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-        const storedRef = (data.ntCode || '').trim().toUpperCase()
-        if (/^(?:NT-[0-9A-Z]{4,16}|BJP-[0-9A-Z]+-[0-9A-Z]+)$/.test(storedRef)) {
-          return { ref: storedRef }
-        }
-      }
-    }
+    // No valid ?ref= in URL — clear any stored referral so a plain return visit
+    // does not ghost-attribute the user to a referrer they didn't come from.
+    try { localStorage.removeItem('bjp_referral') } catch { /* ignore */ }
   } catch { /* ignore */ }
   return { ref: '' }
 }
@@ -2744,19 +2736,13 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
       setLoading(false)
       return
     }
-    chat.getMyMembers(bjpCode)
+    chat.getMyReferrals()
       .then((data) => {
-        // Backend returns a flat { members } array. Also support a legacy
-        // { root, tree } shape by flattening direct + indirect referrals.
-        let list = []
-        if (Array.isArray(data.members)) {
-          list = data.members
-        } else if (Array.isArray(data.tree)) {
-          data.tree.forEach((m) => {
-            list.push(m)
-            if (Array.isArray(m.referrals)) list.push(...m.referrals)
-          })
-        }
+        // Richer endpoint returns { referredMembers } with schemeCount per person.
+        // Falls back to flat { members } shape from the legacy endpoint.
+        const list = Array.isArray(data.referredMembers)
+          ? data.referredMembers
+          : Array.isArray(data.members) ? data.members : []
         setMembers(list)
       })
       .catch((err) => setError(err.message || t('Unable to load referred members.')))
@@ -2836,11 +2822,18 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
                         <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />{district} • {assembly} • {t('Booth')} {booth}
                       </div>
                     </div>
-                    {joined && (
-                      <div style={{ fontSize: 10, color: 'var(--color-ash)', textAlign: 'right', flexShrink: 0 }}>
-                        {t('Joined')}<br />{fmtJoin(joined)}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                      {m.schemeCount > 0 && (
+                        <span style={{ fontSize: 10, background: 'rgba(46,204,113,0.12)', color: 'var(--color-signal-mint)', borderRadius: 6, padding: '2px 7px', fontWeight: 700 }}>
+                          {m.schemeCount} {t('scheme(s)')}
+                        </span>
+                      )}
+                      {joined && (
+                        <div style={{ fontSize: 10, color: 'var(--color-ash)', textAlign: 'right' }}>
+                          {t('Joined')}<br />{fmtJoin(joined)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })
@@ -3682,6 +3675,7 @@ export default function ChatbotPage() {
     mobileRef.current  = ''
     epicRef.current    = ''
     try { localStorage.removeItem('bjp_referral') } catch { /* ignore */ }
+    referralRef.current = { ref: '' }
     // Logout is client-side (stateless JWT): clearCache() already dropped the
     // token + cached session above.
     setSidebarOpen(false)

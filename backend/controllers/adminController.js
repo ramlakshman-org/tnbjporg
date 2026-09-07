@@ -587,7 +587,12 @@ const getMemberReferrals = async (req, res) => {
       return res.status(200).json({ success: true, count: 0, referredVoters: [] });
     }
 
+    // Scope returned referred members to this admin's own jurisdiction.
+    // SUPER_ADMIN and STATE_ADMIN see all; lower roles see only their area.
+    const jurisdictionFilter = getAdminScopeQuery(req.admin);
+
     const referredUsers = await User.find({
+      ...jurisdictionFilter,
       referredBy: { $in: uniqueCodes }
     }).sort({ createdAt: -1 });
 

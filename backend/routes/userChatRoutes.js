@@ -21,7 +21,7 @@ router.post('/validate-epic', validateEpic);
 // (the :param is ignored) so members can only read their OWN data.
 router.get('/profile/:epicNo', protectUser, getProfile);
 router.post('/register-schemes', registerSchemes);
-router.get('/referral-link/:ntCode', getReferralLink);
+router.get('/referral-link/:ntCode', protectUser, getReferralLink);
 router.get('/my-members/:ntCode', protectUser, getMyMembers);
 router.get('/member-status/:ntCode', protectUser, getMemberStatus);
 

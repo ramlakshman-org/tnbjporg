@@ -301,8 +301,24 @@ const registerSchemes = async (req, res) => {
     const incomingRef = String(referredBy || refCode || '').trim().toUpperCase();
     console.log('[registerSchemes] mobile=%s referredBy=%s', cleanMobile, incomingRef || '(none)');
 
+    // Validate referredBy is a real user — reject phantom codes before storing.
+    let validatedRef = '';
+    if (incomingRef) {
+      const refExists = await User.exists({
+        $or: [{ referralCode: incomingRef }, { epicNo: incomingRef }, { mobile: incomingRef }]
+      });
+      if (refExists) validatedRef = incomingRef;
+      else console.log('[registerSchemes] referredBy=%s not found — ignoring', incomingRef);
+    }
+
     if (!user) {
-      const ntCode = 'NT-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      let ntCode;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = 'NT-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        const exists = await User.exists({ referralCode: candidate });
+        if (!exists) { ntCode = candidate; break; }
+      }
+      if (!ntCode) throw new Error('Failed to generate unique referral code');
 
       user = await User.create({
         mobile: cleanMobile || '0000000000',
@@ -313,11 +329,11 @@ const registerSchemes = async (req, res) => {
         boothNo: cleanBooth,
         gender: gender || 'Unspecified',
         referralCode: ntCode,
-        referredBy: incomingRef || null
+        referredBy: validatedRef || null
       });
-    } else if (incomingRef && !user.referredBy && incomingRef !== String(user.referralCode || '').toUpperCase()) {
+    } else if (validatedRef && !user.referredBy && validatedRef !== String(user.referralCode || '').toUpperCase()) {
       // Existing member with no referrer yet → attribute them to this referral.
-      user.referredBy = incomingRef;
+      user.referredBy = validatedRef;
       await user.save();
     }
 
@@ -384,6 +400,7 @@ const registerSchemes = async (req, res) => {
 
 // @desc    Get Referral Link Info
 // @route   GET /api/referral-link/:ntCode
+// @access  Private (User) — requires logged-in member token
 const getReferralLink = async (req, res) => {
   try {
     const { ntCode } = req.params;
@@ -391,15 +408,24 @@ const getReferralLink = async (req, res) => {
 
     const referrer = await User.findOne({
       $or: [{ referralCode: cleanNt }, { epicNo: cleanNt }]
-    });
+    }).select('voterName referralCode epicNo mobile');
 
-    const referralCount = await User.countDocuments({ referredBy: cleanNt });
+    // Count using all 3 identifiers — consistent with admin stats and getMemberStatus
+    const matchCodes = referrer
+      ? [referrer.referralCode, referrer.epicNo, referrer.mobile].filter(Boolean)
+      : [cleanNt];
+    const referralCount = await User.countDocuments({ referredBy: { $in: matchCodes } });
+
+    const clientOrigin = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://tnbjp.org';
+    const referral_link = referrer
+      ? `${clientOrigin.replace(/\/$/, '')}/r/${referrer.referralCode || cleanNt}`
+      : '';
 
     return res.status(200).json({
       success: true,
       ntCode: cleanNt,
       referralCode: cleanNt,
-      referrerName: referrer ? referrer.voterName : 'BJP Supporter',
+      referral_link,
       referralCount
     });
   } catch (error) {
