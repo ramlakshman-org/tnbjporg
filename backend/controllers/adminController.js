@@ -918,6 +918,15 @@ const getApplicationsList = async (req, res) => {
       }
     });
 
+    // referralCode lives on User, not SchemeApplication — fetch it in bulk.
+    const mobileList = paginatedApplicants.map(a => a.mobile).filter(Boolean);
+    const userRefMap = {};
+    if (mobileList.length > 0) {
+      const userDocs = await User.find({ mobile: { $in: mobileList } })
+        .select('mobile referralCode').lean();
+      userDocs.forEach(u => { if (u.mobile) userRefMap[u.mobile] = u.referralCode || ''; });
+    }
+
     const voters = paginatedApplicants.map(u => {
       const userAppMap = new Map();
       if (u.epicNo && appMapByEpic[u.epicNo]) {
@@ -940,7 +949,7 @@ const getApplicationsList = async (req, res) => {
         district: u.district,
         assemblyName: u.assemblyName,
         boothNo: u.boothNo,
-        referralCode: u.referralCode,
+        referralCode: userRefMap[u.mobile] || u.referralCode || '',
         applications: apps
       };
     });
