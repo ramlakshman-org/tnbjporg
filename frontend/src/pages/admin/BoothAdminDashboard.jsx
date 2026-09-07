@@ -17,6 +17,9 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 
 const LIMIT = 20;
 
+const maskMobile = (m) => { const s = String(m || ''); return s.length >= 6 ? s.slice(0, 3) + 'XXXX' + s.slice(-3) : s; };
+const maskEpic = (e) => { const s = String(e || ''); return s.length > 6 ? s.slice(0, 6) + 'XXXX' : s; };
+
 const BoothAdminDashboard = () => {
   const { admin, logoutAdmin } = useAuth();
   const BJP_SCHEMES = useBjpSchemes();
@@ -448,6 +451,7 @@ const BoothAdminDashboard = () => {
             onUpdateAppStatus={handleUpdateAppStatus}
             onSelectVoter={(voter) => setSelectedVoterTimeline(voter)}
             targetSchemeName={schemeFilter}
+            maskPII={true}
           />
         ) : (
           <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
@@ -598,9 +602,9 @@ const BoothAdminDashboard = () => {
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{voter.epicNo}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{maskEpic(voter.epicNo)}</div>
                           </td>
-                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{voter.mobile}</td>
+                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{maskMobile(voter.mobile)}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <span className="tag-pill tag-sunlit" style={{ fontWeight: '700', fontSize: '11px', padding: '4px 10px' }}>
                               <Award size={12} /> {voter.applications.length} Scheme{voter.applications.length > 1 ? 's' : ''}
@@ -702,6 +706,7 @@ const BoothAdminDashboard = () => {
             onBack={() => setSelectedVoterTimeline(null)}
             onUpdateAppStatus={handleUpdateAppStatus}
             onSelectVoter={(voter) => setSelectedVoterTimeline(voter)}
+            maskPII={true}
           />
         ) : (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -961,11 +966,11 @@ const BoothAdminDashboard = () => {
                             <td style={{ padding: '12px 12px', fontWeight: '700', color: '#64748b' }}>{voter.slNo}</td>
                             <td style={{ padding: '12px 12px' }}>
                               <div style={{ fontWeight: '700', color: '#0f172a' }}>{voter.voterName}</div>
-                              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>{voter.epicNo}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>{maskEpic(voter.epicNo)}</div>
                             </td>
                             <td style={{ padding: '12px 12px', color: '#475569', fontWeight: '600' }}>{voter.houseNo || '—'}</td>
                             <td style={{ padding: '12px 12px', color: '#475569' }}>{voter.age > 0 ? `${voter.age} yrs / ${voter.gender}` : voter.gender}</td>
-                            <td style={{ padding: '12px 12px', fontWeight: '600', color: '#0f172a' }}>{voter.mobile}</td>
+                            <td style={{ padding: '12px 12px', fontWeight: '600', color: '#0f172a' }}>{maskMobile(voter.mobile)}</td>
                             <td style={{ padding: '12px 12px' }}>{statusBadge}</td>
                             <td style={{ padding: '12px 12px' }}>
                               {voter.applicationsCount > 0 ? (

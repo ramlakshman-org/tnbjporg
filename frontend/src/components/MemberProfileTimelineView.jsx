@@ -72,7 +72,10 @@ export const getSchemeBgImage = (schemeIdOrName) => {
 
 
 
-const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSelectVoter, targetSchemeName, onDeleteMember }) => {
+const maskMobileDisplay = (m) => { const s = String(m || ''); return s.length >= 6 ? s.slice(0, 3) + 'XXXX' + s.slice(-3) : s; };
+const maskEpicDisplay = (e) => { const s = String(e || ''); return s.length > 6 ? s.slice(0, 6) + 'XXXX' : s; };
+
+const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSelectVoter, targetSchemeName, onDeleteMember, maskPII }) => {
   if (!voterData) return null;
 
   const { voterName, epicNo, mobile, district, assemblyName, boothNo, referralCode, applications = [] } = voterData;
@@ -256,7 +259,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
           className="btn btn-filled"
           style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700', borderRadius: '9999px', background: 'var(--color-midnight-ink)' }}
         >
-          <PhoneCall size={16} /> Call Voter<span className="call-voter-number"> ({mobile})</span>
+          <PhoneCall size={16} /> Call Voter<span className="call-voter-number"> ({maskPII ? maskMobileDisplay(mobile) : mobile})</span>
         </button>
       </div>
 
@@ -284,7 +287,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
                 {voterName}
               </h1>
               <div style={{ fontSize: '14px', color: 'var(--color-slate)', marginTop: '4px' }}>
-                EPIC ID: <strong style={{ fontFamily: 'var(--font-ui-monospace)', color: 'var(--color-midnight-ink)' }}>{epicNo}</strong> • Mobile: <strong style={{ color: 'var(--color-midnight-ink)' }}>{mobile}</strong>
+                EPIC ID: <strong style={{ fontFamily: 'var(--font-ui-monospace)', color: 'var(--color-midnight-ink)' }}>{maskPII ? maskEpicDisplay(epicNo) : epicNo}</strong> • Mobile: <strong style={{ color: 'var(--color-midnight-ink)' }}>{maskPII ? maskMobileDisplay(mobile) : mobile}</strong>
               </div>
             </div>
 
@@ -415,7 +418,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                         <div>
                           <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--color-midnight-ink)' }}>{ref.voterName}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'var(--font-ui-monospace)' }}>{ref.epicNo}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'var(--font-ui-monospace)' }}>{maskPII ? maskEpicDisplay(ref.epicNo) : ref.epicNo}</div>
                         </div>
                         <span className="tag-pill tag-sunlit" style={{ fontSize: '10px', fontWeight: '700', flexShrink: 0 }}>
                           {ref.applications?.length || 0} Scheme(s)
@@ -426,7 +429,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
                         <span>District: <strong style={{ color: 'var(--color-midnight-ink)' }}>{ref.district || '—'}</strong></span>
                         <span>Assembly: <strong style={{ color: 'var(--color-midnight-ink)' }}>{ref.assemblyName || '—'}</strong></span>
                         <span>Booth: <strong style={{ color: 'var(--color-midnight-ink)' }}>{ref.boothNo || '—'}</strong></span>
-                        <span>Mobile: <strong style={{ color: 'var(--color-midnight-ink)' }}>{ref.mobile}</strong></span>
+                        <span>Mobile: <strong style={{ color: 'var(--color-midnight-ink)' }}>{maskPII ? maskMobileDisplay(ref.mobile) : ref.mobile}</strong></span>
                       </div>
                     </div>
                   ))}

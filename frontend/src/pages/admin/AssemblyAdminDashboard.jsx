@@ -19,6 +19,9 @@ import SingleAssemblyMap from '../../components/SingleAssemblyMap';
 
 const LIMIT = 20;
 
+const maskMobile = (m) => { const s = String(m || ''); return s.length >= 6 ? s.slice(0, 3) + 'XXXX' + s.slice(-3) : s; };
+const maskEpic = (e) => { const s = String(e || ''); return s.length > 6 ? s.slice(0, 6) + 'XXXX' : s; };
+
 const AssemblyAdminDashboard = () => {
   const { admin, logoutAdmin } = useAuth();
   const BJP_SCHEMES = useBjpSchemes();
@@ -449,6 +452,7 @@ const AssemblyAdminDashboard = () => {
             onUpdateAppStatus={handleUpdateAppStatus}
             onSelectVoter={(voter) => setSelectedVoterTimeline(voter)}
             targetSchemeName={schemeFilter}
+            maskPII={true}
           />
         ) : (
           <div className="campsite-card" style={{ width: '100%', padding: '24px', boxSizing: 'border-box' }}>
@@ -625,9 +629,9 @@ const AssemblyAdminDashboard = () => {
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{voter.epicNo}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{maskEpic(voter.epicNo)}</div>
                           </td>
-                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{voter.mobile}</td>
+                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{maskMobile(voter.mobile)}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <span className="tag-pill tag-sunlit" style={{ fontWeight: '700', fontSize: '11px', padding: '4px 10px' }}>
                               <Award size={12} /> {voter.applications.length} Scheme{voter.applications.length > 1 ? 's' : ''}
