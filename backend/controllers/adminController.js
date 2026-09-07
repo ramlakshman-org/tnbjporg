@@ -512,22 +512,41 @@ const getDashboardStats = async (req, res) => {
         .slice(0, 5);
     }
 
-    const topReferrers = await Promise.all(
-      rankedReferrers.map(async ({ user: referrerUser, referralCount }) => {
-        const apps = await SchemeApplication.find({ userId: referrerUser._id });
-        return {
-          epicNo: referrerUser.epicNo,
-          voterName: referrerUser.voterName,
-          mobile: referrerUser.mobile,
-          district: referrerUser.district,
-          assemblyName: referrerUser.assemblyName,
-          boothNo: referrerUser.boothNo,
-          referralCode: referrerUser.referralCode,
-          referralCount,
-          applications: apps
-        };
-      })
-    );
+    // Compute L2 network counts for all top referrers in 2 bulk queries — no N+1
+    const topReferrerCodes = rankedReferrers.map(r => r.user.referralCode).filter(Boolean);
+    const networkCountMap = {};
+    if (topReferrerCodes.length > 0) {
+      const l1Users = await User.find({ referredBy: { $in: topReferrerCodes } })
+        .select('referralCode referredBy').lean();
+      const l1Codes = l1Users.map(u => u.referralCode).filter(Boolean);
+      if (l1Codes.length > 0) {
+        const l2Raw = await User.aggregate([
+          { $match: { referredBy: { $in: l1Codes } } },
+          { $group: { _id: '$referredBy', count: { $sum: 1 } } }
+        ]);
+        const l2ByL1Code = {};
+        l2Raw.forEach(r => { if (r._id) l2ByL1Code[r._id] = r.count; });
+        // Map L2 counts back up to each top referrer
+        l1Users.forEach(l1 => {
+          const topCode = l1.referredBy;
+          if (topCode && l1.referralCode) {
+            networkCountMap[topCode] = (networkCountMap[topCode] || 0) + (l2ByL1Code[l1.referralCode] || 0);
+          }
+        });
+      }
+    }
+
+    const topReferrers = rankedReferrers.map(({ user: referrerUser, referralCount }) => ({
+      epicNo: referrerUser.epicNo,
+      voterName: referrerUser.voterName,
+      mobile: referrerUser.mobile,
+      district: referrerUser.district,
+      assemblyName: referrerUser.assemblyName,
+      boothNo: referrerUser.boothNo,
+      referralCode: referrerUser.referralCode,
+      referralCount,
+      networkCount: referralCount + (networkCountMap[referrerUser.referralCode] || 0)
+    }));
 
     const payload = {
       success: true,
@@ -594,24 +613,32 @@ const getMemberReferrals = async (req, res) => {
     const referredUsers = await User.find({
       ...jurisdictionFilter,
       referredBy: { $in: uniqueCodes }
-    }).sort({ createdAt: -1 });
+    }).select('_id epicNo voterName mobile district assemblyName boothNo referralCode')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const referredVoters = await Promise.all(
-      referredUsers.map(async (u) => {
-        const apps = await SchemeApplication.find({ userId: u._id });
-        return {
-          id: u._id,
-          epicNo: u.epicNo,
-          voterName: u.voterName,
-          mobile: u.mobile,
-          district: u.district,
-          assemblyName: u.assemblyName,
-          boothNo: u.boothNo,
-          referralCode: u.referralCode,
-          applications: apps
-        };
-      })
-    );
+    // Fetch L2 counts in ONE bulk aggregation — no N+1
+    const l1Codes = referredUsers.map(u => u.referralCode).filter(Boolean);
+    const l2CountMap = {};
+    if (l1Codes.length > 0) {
+      const l2Raw = await User.aggregate([
+        { $match: { referredBy: { $in: l1Codes } } },
+        { $group: { _id: '$referredBy', count: { $sum: 1 } } }
+      ]);
+      l2Raw.forEach(r => { if (r._id) l2CountMap[r._id] = r.count; });
+    }
+
+    const referredVoters = referredUsers.map(u => ({
+      id: u._id,
+      epicNo: u.epicNo,
+      voterName: u.voterName,
+      mobile: u.mobile,
+      district: u.district,
+      assemblyName: u.assemblyName,
+      boothNo: u.boothNo,
+      referralCode: u.referralCode,
+      level2Count: l2CountMap[u.referralCode] || 0
+    }));
 
     return res.status(200).json({
       success: true,
@@ -842,6 +869,19 @@ const getApplicationsList = async (req, res) => {
           console.error('[Name Enrichment Error]:', enrichErr.message);
           // Non-fatal — continue with what we have
         }
+      }
+
+      // referralCode lives on User, not SchemeApplication — patch it in bulk.
+      const fastMobiles = voters.map(v => v.mobile).filter(m => m && m !== 'N/A');
+      if (fastMobiles.length > 0) {
+        const fastUserDocs = await User.find({ mobile: { $in: fastMobiles } })
+          .select('mobile referralCode').lean();
+        const fastRefMap = {};
+        fastUserDocs.forEach(u => { if (u.mobile) fastRefMap[u.mobile] = u.referralCode || ''; });
+        voters = voters.map(v => ({
+          ...v,
+          referralCode: fastRefMap[v.mobile] || v.referralCode || ''
+        }));
       }
 
       return res.status(200).json({
@@ -1979,6 +2019,24 @@ const warmCoverageCache = async () => {
   }
 };
 
+// @desc    Permanently delete a member + all their scheme applications (SUPER_ADMIN only)
+// @route   DELETE /api/admin/members/:userId
+const deleteMember = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'Member not found' });
+
+    await SchemeApplication.deleteMany({ userId });
+    await User.findByIdAndDelete(userId);
+
+    return res.status(200).json({ success: true, message: `Member ${user.voterName} and all their applications deleted.` });
+  } catch (err) {
+    console.error('[deleteMember Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to delete member' });
+  }
+};
+
 module.exports = {
   adminLogin,
   warmStatsCache,
@@ -2000,5 +2058,6 @@ module.exports = {
   getBoothVoterRoll,
   getMapAnalytics,
   getTrends,
-  getCoverage
+  getCoverage,
+  deleteMember
 };

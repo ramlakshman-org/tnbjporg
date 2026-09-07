@@ -19,7 +19,8 @@ const {
   getBoothVoterRoll,
   getMapAnalytics,
   getTrends,
-  getCoverage
+  getCoverage,
+  deleteMember
 } = require('../controllers/adminController');
 const {
   getAllSchemesAdmin,
@@ -51,6 +52,9 @@ router.put('/applications/:id/status', protectAdmin, updateApplicationStatus);
 router.put('/applications/bulk-status', protectAdmin, bulkUpdateApplicationStatus);
 router.post('/create-credential', protectAdmin, authorizeRoles('SUPER_ADMIN'), createAdminCredential);
 router.get('/credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllAdmins);
+
+// ── Member management (SUPER_ADMIN only) ──
+router.delete('/members/:userId', protectAdmin, authorizeRoles('SUPER_ADMIN'), deleteMember);
 
 // ── Scheme management (SUPER_ADMIN only) ──
 router.get('/schemes', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllSchemesAdmin);
