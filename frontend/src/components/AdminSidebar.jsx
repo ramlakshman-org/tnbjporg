@@ -204,9 +204,9 @@ const AdminSidebar = ({
             </div>
             <button
               type="button"
-              onClick={onToggleCollapse}
+              onClick={isMobileOpen ? () => onSelectTab && onSelectTab(activeTab) : onToggleCollapse}
               className="admin-toggle-btn"
-              title="Collapse Sidebar"
+              title={isMobileOpen ? 'Close Menu' : 'Collapse Sidebar'}
               style={{
                 marginLeft: 'auto',
                 background: 'none',
