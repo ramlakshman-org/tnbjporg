@@ -109,9 +109,16 @@ const TopReferrersCard = ({ topReferrers = [], scopeLabel = '', onViewProfile })
                     ) : '—'}
                   </td>
                   <td style={{ padding: '16px' }}>
-                    <span className="badge-status badge-confirmed" style={{ fontSize: '13px', padding: '6px 14px' }}>
-                      {ref.referralCount} referred
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span className="badge-status badge-confirmed" style={{ fontSize: '13px', padding: '6px 14px' }}>
+                        {ref.referralCount} direct
+                      </span>
+                      {ref.networkCount > ref.referralCount && (
+                        <span style={{ fontSize: '12px', color: 'var(--color-mid-gray)', paddingLeft: '2px' }}>
+                          +{ref.networkCount - ref.referralCount} network · {ref.networkCount} total
+                        </span>
+                      )}
+                    </div>
                   </td>
                   {onViewProfile && (
                     <td style={{ padding: '16px', textAlign: 'right' }}>

@@ -8,30 +8,40 @@ const getReferralStats = async (req, res) => {
   try {
     const user = req.user;
     const matchCodes = [user.referralCode, user.epicNo, user.mobile].filter(Boolean);
-    const referredUsers = await User.find({ referredBy: { $in: matchCodes } }).sort({ createdAt: -1 });
 
-    const referredMembers = await Promise.all(
-      referredUsers.map(async (refUser) => {
-        const apps = await SchemeApplication.find({ userId: refUser._id }).sort({ appliedAt: -1 });
-        return {
-          id: refUser._id,
-          voterName: refUser.voterName,
-          epicNo: refUser.epicNo,
-          district: refUser.district,
-          assemblyName: refUser.assemblyName,
-          boothNo: refUser.boothNo,
-          mobileMasked: refUser.mobile && refUser.mobile.length >= 10 ? refUser.mobile.slice(0, 3) + '*****' + refUser.mobile.slice(-2) : refUser.mobile,
-          joinedAt: refUser.createdAt,
-          schemeCount: apps.length,
-          applications: apps
-        };
-      })
-    );
+    // Fetch L1 referred users (people this user directly referred)
+    const referredUsers = await User.find({ referredBy: { $in: matchCodes } })
+      .select('_id voterName district referralCode')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Fetch L2 counts in ONE bulk aggregation — no N+1
+    const l1Codes = referredUsers.map(u => u.referralCode).filter(Boolean);
+    const l2CountMap = {};
+    if (l1Codes.length > 0) {
+      const l2Raw = await User.aggregate([
+        { $match: { referredBy: { $in: l1Codes } } },
+        { $group: { _id: '$referredBy', count: { $sum: 1 } } }
+      ]);
+      l2Raw.forEach(r => { if (r._id) l2CountMap[r._id] = r.count; });
+    }
+
+    const totalNetwork = Object.values(l2CountMap).reduce((a, b) => a + b, 0);
+
+    const referredMembers = referredUsers.map(refUser => ({
+      id: refUser._id,
+      voterName: refUser.voterName,
+      district: refUser.district,
+      level2Count: l2CountMap[refUser.referralCode] || 0
+    }));
 
     return res.status(200).json({
       success: true,
       referralCode: user.referralCode,
-      totalReferred: referredMembers.length,
+      totalDirect: referredMembers.length,
+      totalNetwork,
+      totalImpact: referredMembers.length + totalNetwork,
+      totalReferred: referredMembers.length, // backward compat
       referredMembers
     });
   } catch (error) {

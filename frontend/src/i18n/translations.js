@@ -54,7 +54,7 @@ export const ta = {
   "Everyone who joins via your link or QR appears in your *My Members* list.": "உங்கள் இணைப்பு அல்லது QR மூலம் இணைபவர்கள் அனைவரும் உங்கள் *எனது உறுப்பினர்கள்* பட்டியலில் பார்த்துக்கொள்ளலாம்.",
   "No referral link available.": "பரிந்துரை இணைப்பு எதுவும் இல்லை.",
   "*🪷 Join BJP Tamil Nadu!*": "*🪷 தமிழக பாஜக-வில் இணையுங்கள்!*",
-  "*Generate your free Digital Member ID Card here:*": "*உங்கள் இலவச டிஜிட்டல் உறுப்பினர் அடையாள அட்டையை இங்கு உருவாக்கவும்:*",
+  "*Apply for BJP Nalam Thittam welfare schemes — register here:*": "*பாஜக நலம் திட்ட நலத்திட்டங்களுக்கு விண்ணப்பிக்கவும் — இங்கே பதிவு செய்யவும்:*",
   "Select one or more schemes you are interested in": "நீங்கள் விரும்பும் ஒன்று அல்லது அதற்கு மேற்பட்ட நலத்திட்டங்களை தேர்ந்தெடுக்கவும்",
   "scheme(s) selected": "நலத்திட்டம்(கள்) தேர்ந்தெடுக்கப்பட்டது",
   "{count} scheme(s) selected ✓": "{count} நலத்திட்டம்(கள்) தேர்ந்தெடுக்கப்பட்டது ✓",

@@ -380,7 +380,7 @@ function FullReferralPanel({ link, onBack }) {
   const handleShareWhatsApp = () => {
     if (!link || !canvasRef.current) return
     // WhatsApp bold markdown: *text*
-    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Generate your free Digital Member ID Card here:*')}\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for BJP Nalam Thittam welfare schemes — register here:*')}\n${link}`
     // Try Web Share API (mobile) — sends QR image + text as a single share
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
@@ -2097,7 +2097,7 @@ function ReferralLinkMsg({ link }) {
 
   const handleShareWhatsApp = () => {
     if (!link) return
-    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Generate your free Digital Member ID Card here:*')}\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for BJP Nalam Thittam welfare schemes — register here:*')}\n${link}`
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
         const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
@@ -2727,6 +2727,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
 function MyReferralsListPanel({ bjpCode, onBack }) {
   const { t } = useLang()
   const [members, setMembers] = useState([])
+  const [networkStats, setNetworkStats] = useState({ totalDirect: 0, totalNetwork: 0, totalImpact: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -2738,12 +2739,15 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
     }
     chat.getMyReferrals()
       .then((data) => {
-        // Richer endpoint returns { referredMembers } with schemeCount per person.
-        // Falls back to flat { members } shape from the legacy endpoint.
         const list = Array.isArray(data.referredMembers)
           ? data.referredMembers
           : Array.isArray(data.members) ? data.members : []
         setMembers(list)
+        setNetworkStats({
+          totalDirect: data.totalDirect ?? list.length,
+          totalNetwork: data.totalNetwork ?? 0,
+          totalImpact: data.totalImpact ?? list.length
+        })
       })
       .catch((err) => setError(err.message || t('Unable to load referred members.')))
       .finally(() => setLoading(false))
@@ -2784,9 +2788,17 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
-            <div style={{ fontSize: 13, color: 'var(--color-signal-mint)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--color-graphite)', paddingBottom: 10 }}>
-              <i className="bi bi-people-fill" />
-              {t('{count} people joined using your referral link', { count: members.length })}
+            <div style={{ borderBottom: '1px solid var(--color-graphite)', paddingBottom: 12, marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-signal-mint)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, marginBottom: networkStats.totalNetwork > 0 ? 6 : 0 }}>
+                <i className="bi bi-people-fill" />
+                {networkStats.totalDirect} {t('direct referrals')}
+              </div>
+              {networkStats.totalNetwork > 0 && (
+                <div style={{ fontSize: 12, color: 'var(--color-ash)', display: 'flex', gap: 12, paddingLeft: 2 }}>
+                  <span>+{networkStats.totalNetwork} {t('through them')}</span>
+                  <span style={{ color: 'var(--color-signal-mint)', fontWeight: 700 }}>= {networkStats.totalImpact} {t('total impact')}</span>
+                </div>
+              )}
             </div>
 
             {members.length === 0 ? (
@@ -2800,11 +2812,8 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
             ) : (
               members.map((m, idx) => {
                 const name = m.voterName || m.name || 'BJP Member'
-                const epic = m.epicNo || m.epic_no || '—'
                 const district = m.district || '—'
-                const assembly = m.assemblyName || m.assembly_name || '—'
-                const booth = m.boothNo || m.part_no || '—'
-                const joined = m.createdAt || m.generated_at
+                const level2 = m.level2Count || 0
                 return (
                   <div key={m._id || m.epicNo || m.bjp_code || idx} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
@@ -2816,21 +2825,11 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
                     <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
                       <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2 }}>
-                        <i className="bi bi-card-text" style={{ marginRight: 4 }} />{epic}
+                        <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />{district}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />{district} • {assembly} • {t('Booth')} {booth}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                      {m.schemeCount > 0 && (
-                        <span style={{ fontSize: 10, background: 'rgba(46,204,113,0.12)', color: 'var(--color-signal-mint)', borderRadius: 6, padding: '2px 7px', fontWeight: 700 }}>
-                          {m.schemeCount} {t('scheme(s)')}
-                        </span>
-                      )}
-                      {joined && (
-                        <div style={{ fontSize: 10, color: 'var(--color-ash)', textAlign: 'right' }}>
-                          {t('Joined')}<br />{fmtJoin(joined)}
+                      {level2 > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--color-signal-mint)', marginTop: 3, fontWeight: 600 }}>
+                          ↳ {t('Brought')} {level2} {level2 === 1 ? t('more person') : t('more people')}
                         </div>
                       )}
                     </div>
