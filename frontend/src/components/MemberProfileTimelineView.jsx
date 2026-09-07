@@ -72,7 +72,7 @@ export const getSchemeBgImage = (schemeIdOrName) => {
 
 
 
-const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSelectVoter, targetSchemeName }) => {
+const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSelectVoter, targetSchemeName, onDeleteMember }) => {
   if (!voterData) return null;
 
   const { voterName, epicNo, mobile, district, assemblyName, boothNo, referralCode, applications = [] } = voterData;
@@ -586,6 +586,35 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
         </div>
 
       </div>
+
+      {onDeleteMember && (
+        <div style={{ padding: '20px 28px 28px', borderTop: '1px solid var(--color-linen)', marginTop: '8px' }}>
+          <button
+            onClick={() => {
+              const name = (voterData.voterName || '').replace(/\s*-\s*$/, '').trim();
+              if (window.confirm(`Are you sure? This will permanently delete ${name} and all their scheme applications. This cannot be undone.`)) {
+                onDeleteMember(voterData);
+              }
+            }}
+            style={{
+              background: '#fee2e2',
+              color: '#dc2626',
+              border: '1px solid #fca5a5',
+              borderRadius: '10px',
+              padding: '8px 20px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            🗑 Delete Member (Full Reset)
+          </button>
+          <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)', marginTop: '6px' }}>
+            Permanently deletes this member and all their applications. Use for testing resets only.
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

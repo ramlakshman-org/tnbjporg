@@ -6,6 +6,7 @@ import ChatbotPage from './pages/ChatbotPage';
 import ReferralPage from './pages/ReferralPage';
 import Navbar from './components/Navbar';
 import AdminPortal from './pages/AdminPortal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const MainAppContent = () => {
   const { admin } = useAuth();
@@ -17,7 +18,11 @@ const MainAppContent = () => {
 
   // 1. Render Admin Portal if URL starts with /admin or admin is logged in
   if (isAdminRoute) {
-    return <AdminPortal />;
+    return (
+      <ErrorBoundary>
+        <AdminPortal />
+      </ErrorBoundary>
+    );
   }
 
 

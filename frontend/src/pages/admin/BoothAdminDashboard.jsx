@@ -13,6 +13,7 @@ import SchemePieChart from '../../components/SchemePieChart';
 import TrendsChart from '../../components/TrendsChart';
 import CoverageTable from '../../components/CoverageTable';
 import AdminSidebar from '../../components/AdminSidebar';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 const LIMIT = 20;
 
@@ -258,6 +259,7 @@ const BoothAdminDashboard = () => {
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
 
             {/* ── 4 Stat Cards ── */}
+            <ErrorBoundary inline>
             <div className="stat-cards-grid">
 
 
@@ -283,7 +285,7 @@ const BoothAdminDashboard = () => {
                   <Users size={20} />
                 </div>
                 <div style={{ width: '100%' }}>
-                  <div className="stat-number">{statsData.overview.totalVotersRequested ?? statsData.overview.totalUsers ?? 0}</div>
+                  <div className="stat-number">{statsData.overview?.totalVotersRequested ?? statsData.overview?.totalUsers ?? 0}</div>
                   <div className="stat-label">Voters Requested Schemes</div>
                   <div className="stat-sub">Enrolled in Program</div>
                 </div>
@@ -300,7 +302,7 @@ const BoothAdminDashboard = () => {
                   <FileText size={20} />
                 </div>
                 <div style={{ width: '100%' }}>
-                  <div className="stat-number">{statsData.overview.totalApplications}</div>
+                  <div className="stat-number">{statsData.overview?.totalApplications ?? 0}</div>
                   <div className="stat-label">Booth {admin.boothNo} Applications</div>
                   <div className="stat-sub" style={{ color: 'var(--color-electric-blue)', fontWeight: '500' }}>Click to View Applications →</div>
                 </div>
@@ -318,13 +320,14 @@ const BoothAdminDashboard = () => {
                 </div>
                 <div style={{ width: '100%' }}>
                   <div className="stat-number" style={{ color: 'var(--color-forest-pulse)' }}>
-                    {statsData.overview.statusBreakdown?.Approved || 0}
+                    {statsData.overview?.statusBreakdown?.Approved || 0}
                   </div>
                   <div className="stat-label">Approved Directives</div>
                   <div className="stat-sub" style={{ color: 'var(--color-forest-pulse)', fontWeight: '500' }}>Click to View Approved →</div>
                 </div>
               </div>
             </div>
+            </ErrorBoundary>
 
 
             {/* ── Daily Registration Trend ── */}
@@ -340,11 +343,13 @@ const BoothAdminDashboard = () => {
             />
 
             {/* ── Top 5 Referral Champions Section ── */}
-            <TopReferrersCard
-              topReferrers={statsData.topReferrers || []}
-              scopeLabel={`Booth ${admin.boothNo}`}
-              onViewProfile={(ref) => handleOpenVoterDetails(ref)}
-            />
+            <ErrorBoundary inline>
+              <TopReferrersCard
+                topReferrers={statsData.topReferrers || []}
+                scopeLabel={`Booth ${admin.boothNo}`}
+                onViewProfile={(ref) => handleOpenVoterDetails(ref)}
+              />
+            </ErrorBoundary>
 
 
             {/* ── Top Schemes ── */}
@@ -617,6 +622,21 @@ const BoothAdminDashboard = () => {
                                 style={{ padding: '5px 10px', fontSize: '12px' }}
                               >
                                 <PhoneCall size={13} /> Call
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const digits = String(voter.mobile || '').replace(/\D/g, '');
+                                  const phone = digits.length === 10 ? `91${digits}` : digits;
+                                  const name = (voter.voterName || '').replace(/\s*-\s*$/, '').trim();
+                                  const msg = encodeURIComponent(`Hi ${name}, regarding your BJP Nalam Thittam welfare scheme registration — please call us or reply here for any help.`);
+                                  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                                }}
+                                className="btn btn-ghost"
+                                style={{ padding: '5px 10px', fontSize: '12px', color: '#25D366' }}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.132.561 4.13 1.535 5.862L0 24l6.29-1.516A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.002-1.368l-.359-.213-3.731.899.937-3.627-.234-.373A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+                                WA
                               </button>
                             </div>
                           </td>
@@ -957,15 +977,34 @@ const BoothAdminDashboard = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px 12px', textAlign: 'right' }}>
-                              {voter.mobile && voter.mobile !== '—' && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${voter.mobile}`; }}
-                                  className="btn btn-ghost"
-                                  style={{ padding: '5px 10px', fontSize: '12px' }}
-                                >
-                                  <PhoneCall size={13} /> Call
-                                </button>
-                              )}
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                {voter.mobile && voter.mobile !== '—' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${voter.mobile}`; }}
+                                    className="btn btn-ghost"
+                                    style={{ padding: '5px 10px', fontSize: '12px' }}
+                                  >
+                                    <PhoneCall size={13} /> Call
+                                  </button>
+                                )}
+                                {voter.mobile && voter.mobile !== '—' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const digits = String(voter.mobile || '').replace(/\D/g, '');
+                                      const phone = digits.length === 10 ? `91${digits}` : digits;
+                                      const name = (voter.voterName || '').replace(/\s*-\s*$/, '').trim();
+                                      const msg = encodeURIComponent(`Hi ${name}, regarding your BJP Nalam Thittam welfare scheme registration — please call us or reply here for any help.`);
+                                      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                                    }}
+                                    className="btn btn-ghost"
+                                    style={{ padding: '5px 10px', fontSize: '12px', color: '#25D366' }}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.132.561 4.13 1.535 5.862L0 24l6.29-1.516A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.002-1.368l-.359-.213-3.731.899.937-3.627-.234-.373A9.786 9.786 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+                                    WA
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
