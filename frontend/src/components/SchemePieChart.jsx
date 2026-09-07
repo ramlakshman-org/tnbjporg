@@ -171,7 +171,7 @@ const SchemePieChart = ({ schemePopularity = [], scopeLabel = '' }) => {
           justifyContent: 'center',
           padding: '16px'
         }}>
-          <svg width="260" height="260" viewBox="0 0 260 260" style={{ overflow: 'visible' }}>
+          <svg viewBox="0 0 260 260" style={{ overflow: 'visible', width: '100%', maxWidth: '260px', height: 'auto' }}>
             <g transform="translate(0, 0)">
               {chartData.slices.map((slice, idx) => {
                 const isHovered = hoveredIdx === idx;

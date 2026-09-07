@@ -4,7 +4,10 @@ import { Share2, ChevronRight } from 'lucide-react';
 /**
  * Shared Top Referral Champions card — Apple (España) style reference.
  */
-const TopReferrersCard = ({ topReferrers = [], scopeLabel = '', onViewProfile }) => {
+const maskMobile = (m) => { const s = String(m || ''); return s.length >= 6 ? s.slice(0, 3) + 'XXXX' + s.slice(-3) : s; };
+const maskEpic = (e) => { const s = String(e || ''); return s.length > 6 ? s.slice(0, 6) + 'XXXX' : s; };
+
+const TopReferrersCard = ({ topReferrers = [], scopeLabel = '', onViewProfile, maskPII = false }) => {
   const MEDAL = ['🥇', '🥈', '🥉'];
 
   return (
@@ -93,12 +96,12 @@ const TopReferrersCard = ({ topReferrers = [], scopeLabel = '', onViewProfile })
                         {MEDAL[idx] || `#${idx + 1}`}
                       </span>
                       <span style={{ fontWeight: '500', color: 'var(--color-primary-ink)', fontSize: '15px' }}>
-                        {ref.voterName || `Referrer (${ref.epicNo})`}
+                        {ref.voterName || `Referrer (${maskPII ? maskEpic(ref.epicNo) : ref.epicNo})`}
                       </span>
                     </div>
                   </td>
                   <td style={{ padding: '16px', fontFamily: 'var(--font-ui-monospace)', fontWeight: '500', color: 'var(--color-mid-gray)', fontSize: '13px' }}>
-                    {ref.epicNo || ref.referralCode || '—'}
+                    {maskPII ? maskEpic(ref.epicNo || ref.referralCode || '') || '—' : (ref.epicNo || ref.referralCode || '—')}
                   </td>
                   <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-mid-gray)' }}>
                     {ref.district ? (

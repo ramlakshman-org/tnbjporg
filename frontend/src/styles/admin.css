@@ -570,6 +570,21 @@
 
 .admin-table tbody tr:hover td { background: var(--color-canvas); }
 
+/* ── Sticky action column (Call/WA buttons) ── */
+.sticky-col {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: white;
+}
+thead .sticky-col {
+  background: var(--color-fog-gray, #f4f4f7);
+  z-index: 2;
+}
+tr:hover td.sticky-col {
+  background: var(--color-fog-gray, #f4f4f7);
+}
+
 /* ── Form controls — Apple Pill Inputs ───────────────────── */
 .admin-search-input {
   background: var(--color-canvas);

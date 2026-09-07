@@ -424,6 +424,7 @@ const AssemblyAdminDashboard = () => {
               <TopReferrersCard
                 topReferrers={statsData.topReferrers || []}
                 scopeLabel={admin?.assemblyName || ''}
+                maskPII={true}
                 onViewProfile={(ref) => {
                   if (ref && ref.epicNo) { setSubPage('applications'); setSelectedVoterTimeline(ref); }
                 }}
@@ -581,7 +582,7 @@ const AssemblyAdminDashboard = () => {
                     <th style={{ padding: '12px 10px' }}>Applied Date &amp; Time</th>
                     <th style={{ padding: '12px 10px' }}>Booth</th>
                     <th style={{ padding: '12px 10px' }}>Latest Status</th>
-                    <th style={{ padding: '12px 10px', textAlign: 'right' }}>Actions</th>
+                    <th className="sticky-col" style={{ padding: '12px 10px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -648,7 +649,7 @@ const AssemblyAdminDashboard = () => {
                           <td style={{ padding: '12px 10px' }}>
                             <StatusBadge status={latestApp?.status || 'Pending'} />
                           </td>
-                          <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                          <td className="sticky-col" style={{ padding: '12px 10px', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '6px' }}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDirectCallVoter(voter); }}

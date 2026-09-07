@@ -350,6 +350,7 @@ const BoothAdminDashboard = () => {
               <TopReferrersCard
                 topReferrers={statsData.topReferrers || []}
                 scopeLabel={`Booth ${admin.boothNo}`}
+                maskPII={true}
                 onViewProfile={(ref) => handleOpenVoterDetails(ref)}
               />
             </ErrorBoundary>
@@ -554,7 +555,7 @@ const BoothAdminDashboard = () => {
                     <th style={{ padding: '12px 10px' }}>Schemes Applied</th>
                     <th style={{ padding: '12px 10px' }}>Applied Date &amp; Time</th>
                     <th style={{ padding: '12px 10px' }}>Latest Status</th>
-                    <th style={{ padding: '12px 10px', textAlign: 'right' }}>Actions</th>
+                    <th className="sticky-col" style={{ padding: '12px 10px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -618,7 +619,7 @@ const BoothAdminDashboard = () => {
                           <td style={{ padding: '12px 10px' }}>
                             <StatusBadge status={latestApp?.status || 'Pending'} />
                           </td>
-                          <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                          <td className="sticky-col" style={{ padding: '12px 10px', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '6px' }}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDirectCallVoter(voter); }}
@@ -900,7 +901,7 @@ const BoothAdminDashboard = () => {
                       <th style={{ padding: '12px 12px' }}>Mobile</th>
                       <th style={{ padding: '12px 12px' }}>Status</th>
                       <th style={{ padding: '12px 12px' }}>Schemes</th>
-                      <th style={{ padding: '12px 12px', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Action</th>
+                      <th className="sticky-col" style={{ padding: '12px 12px', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -981,7 +982,7 @@ const BoothAdminDashboard = () => {
                                 <span style={{ fontSize: '12px', color: '#94a3b8' }}>0 Schemes</span>
                               )}
                             </td>
-                            <td style={{ padding: '12px 12px', textAlign: 'right' }}>
+                            <td className="sticky-col" style={{ padding: '12px 12px', textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', gap: '6px' }}>
                                 {voter.mobile && voter.mobile !== '—' && (
                                   <button
