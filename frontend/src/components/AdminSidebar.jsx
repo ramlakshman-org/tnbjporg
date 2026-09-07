@@ -16,6 +16,8 @@ const AdminSidebar = ({
   isMobileOpen = false,
 }) => {
   const role = admin?.role || 'SUPER_ADMIN';
+  // On mobile (when sidebar is open), always show expanded — never icon-only
+  const collapsed = isMobileOpen ? false : isCollapsed;
 
   const getNavItems = () => {
     switch (role) {
@@ -80,10 +82,10 @@ const AdminSidebar = ({
 
   return (
     <aside
-      className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}
+      className={`admin-sidebar ${collapsed ? 'collapsed' : ''} ${isMobileOpen ? 'open' : ''}`}
       style={{
-        width: isCollapsed ? '68px' : '240px',
-        minWidth: isCollapsed ? '68px' : '240px',
+        width: collapsed ? '68px' : '240px',
+        minWidth: collapsed ? '68px' : '240px',
         height: '100vh',
         maxHeight: '100vh',
         top: 0,
@@ -102,17 +104,17 @@ const AdminSidebar = ({
       <div
         className="admin-sidebar-header"
         style={{
-          padding: isCollapsed ? '16px 8px' : '16px 18px',
+          padding: collapsed ? '16px 8px' : '16px 18px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isCollapsed ? 'center' : 'flex-start',
-          gap: isCollapsed ? '8px' : '12px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          gap: collapsed ? '8px' : '12px',
           borderBottom: '1px solid var(--color-cool-wash, #e8e8ed)',
           minHeight: '72px',
           boxSizing: 'border-box'
         }}
       >
-        {isCollapsed ? (
+        {collapsed ? (
           <div
             style={{
               display: 'flex',
@@ -239,7 +241,7 @@ const AdminSidebar = ({
           overflowY: 'auto'
         }}
       >
-        {!isCollapsed && (
+        {!collapsed && (
           <div style={{
             fontSize: '11px',
             fontWeight: '600',
@@ -266,7 +268,7 @@ const AdminSidebar = ({
                 if (onSelectTab) onSelectTab(item.id);
               }}
               className={`admin-nav-item ${isActive ? 'active' : ''}`}
-              title={isCollapsed ? item.label : undefined}
+              title={collapsed ? item.label : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -284,7 +286,7 @@ const AdminSidebar = ({
               }}
             >
               <Icon size={18} style={{ flexShrink: 0 }} />
-              {!isCollapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
+              {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
             </a>
           );
         })}
@@ -299,7 +301,7 @@ const AdminSidebar = ({
           boxSizing: 'border-box'
         }}
       >
-        {admin?.username && !isCollapsed && (
+        {admin?.username && !collapsed && (
           <div style={{
             fontSize: '12px',
             color: 'var(--color-mid-gray, #707070)',
@@ -336,7 +338,7 @@ const AdminSidebar = ({
           }}
         >
           <LogOut size={16} />
-          {!isCollapsed && <span>Sign Out</span>}
+          {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

@@ -145,12 +145,12 @@ const SchemePieChart = ({ schemePopularity = [], scopeLabel = '' }) => {
             Scheme Breakdown & Distribution {scopeLabel ? `— ${scopeLabel}` : ''}
           </h3>
           <div style={{ fontSize: '14px', color: 'var(--color-mid-gray)', marginTop: '4px' }}>
-            Application distribution across all 23 BJP Central Welfare Schemes
+            Application distribution across all {BJP_SCHEMES.length} BJP Central Welfare Schemes
           </div>
         </div>
         <span className="tag-pill tag-active" style={{ fontSize: '13px', background: 'var(--color-canvas)', color: 'var(--color-primary-ink)' }}>
           <Layers size={14} style={{ marginRight: '4px' }} />
-          23 Welfare Schemes
+          {BJP_SCHEMES.length} Welfare Schemes
         </span>
       </div>
 
