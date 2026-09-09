@@ -1262,6 +1262,9 @@ function MySchemePanel({ epicNo, mobile, onBack }) {
   const [notificationToast, setNotificationToast] = useState(null);
   const [appliedAppsMap, setAppliedAppsMap] = useState({}); // schemeId -> application doc (with statusHistory)
   const [trackingScheme, setTrackingScheme] = useState(null); // { scheme, app } when viewing tracking detail
+  const [userObj, setUserObj] = useState({});
+  const [suggestionText, setSuggestionText] = useState('');
+  const [suggestionStatus, setSuggestionStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
 
   useEffect(() => {
     const activeEpic = epicNo || localStorage.getItem('bjp_user_epic') || '';
@@ -1305,14 +1308,15 @@ function MySchemePanel({ epicNo, mobile, onBack }) {
     if (activeEpic || activeMobile) {
       chat.profile(activeEpic || 'user', activeMobile)
         .then(data => {
+          if (data.user) setUserObj(data.user);
           const apps = data.applications || [];
           const updatedMap = { ...localAppliedMap };
           const appsMap = {};
           const titlesList = [];
 
           apps.forEach(app => {
-            const sName = app.schemeName || app.schemeId;
-            const match = findSchemeMatch(sName);
+            // Prefer numeric schemeId for reliable matching; fall back to schemeName
+            const match = findSchemeMatch(app.schemeId) || findSchemeMatch(app.schemeName);
             if (match) {
               updatedMap[match.id] = 'applied';
               appsMap[match.id] = app;
@@ -1348,14 +1352,15 @@ function MySchemePanel({ epicNo, mobile, onBack }) {
     const activeMobile = mobile || localStorage.getItem('bjp_user_mobile') || '';
 
     try {
+      const u = userObj || {};
       const reg = await chat.registerSchemes({
         mobile: activeMobile,
         epicNo: activeEpic,
-        voterName: userObj.voter_name || userObj.voterName || 'BJP Member',
-        district: userObj.district || 'TAMIL NADU',
-        assemblyName: userObj.assembly_name || userObj.assemblyName || 'Assembly',
-        boothNo: userObj.part_no || userObj.boothNo || '1',
-        schemeIds: [scheme.title]
+        voterName: u.voter_name || u.voterName || 'BJP Member',
+        district: u.district || 'TAMIL NADU',
+        assemblyName: u.assembly_name || u.assemblyName || 'Assembly',
+        boothNo: u.part_no || u.boothNo || '1',
+        schemeIds: [scheme.id]
       });
       // Store the JWT issued on registration so later protected calls work.
       if (reg?.token) localStorage.setItem('bjp_user_token', reg.token)
@@ -1370,7 +1375,7 @@ function MySchemePanel({ epicNo, mobile, onBack }) {
       try {
         const raw = localStorage.getItem(storageKey);
         let list = raw ? JSON.parse(raw) : [];
-        if (!list.includes(scheme.title)) list.push(scheme.title);
+        if (!list.includes(scheme.id)) list.push(scheme.id);
         localStorage.setItem(storageKey, JSON.stringify(list));
       } catch (e) {}
 
@@ -2044,6 +2049,58 @@ function MySchemePanel({ epicNo, mobile, onBack }) {
               </div>
             )}
 
+          </div>
+
+          {/* ── Scheme Suggestion Box ── */}
+          <div className="scheme-suggestion-box">
+            <div className="suggestion-box-header">
+              <i className="bi bi-lightbulb-fill" style={{ color: '#C9A961' }} />
+              <span>{t('Looking for a scheme not listed here?')}</span>
+            </div>
+            <p className="suggestion-box-sub">{t('Tell us which scheme you are interested in and we will look into it.')}</p>
+            {suggestionStatus === 'sent' ? (
+              <div className="suggestion-sent">
+                <i className="bi bi-check-circle-fill" /> {t('Thank you! We have received your request.')}
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="suggestion-textarea"
+                  rows={3}
+                  maxLength={500}
+                  placeholder={t('e.g. PM Vishwakarma Yojana, Stand Up India...')}
+                  value={suggestionText}
+                  onChange={e => setSuggestionText(e.target.value)}
+                  disabled={suggestionStatus === 'sending'}
+                />
+                <div className="suggestion-footer">
+                  <span className="suggestion-char-count">{suggestionText.length}/500</span>
+                  <button
+                    className="suggestion-send-btn"
+                    disabled={!suggestionText.trim() || suggestionStatus === 'sending'}
+                    onClick={async () => {
+                      if (!suggestionText.trim()) return;
+                      setSuggestionStatus('sending');
+                      try {
+                        await chat.suggestScheme(suggestionText.trim());
+                        setSuggestionStatus('sent');
+                        setSuggestionText('');
+                      } catch {
+                        setSuggestionStatus('error');
+                        setTimeout(() => setSuggestionStatus(null), 3000);
+                      }
+                    }}
+                  >
+                    {suggestionStatus === 'sending'
+                      ? <><i className="bi bi-hourglass-split" /> {t('Sending...')}</>
+                      : suggestionStatus === 'error'
+                      ? <><i className="bi bi-exclamation-circle" /> {t('Try again')}</>
+                      : <><i className="bi bi-send-fill" /> {t('Send Request')}</>
+                    }
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
         </div>
@@ -3487,6 +3544,7 @@ export default function ChatbotPage() {
   const [hasSchemeUpdate, setHasSchemeUpdate] = useState(false)
 
   const [referredCount, setReferredCount] = useState(0)
+  const [mySchemeToast, setMySchemeToast] = useState(false)
 
   // Snapshot of the user's scheme applications (status + history length) for
   // detecting admin status updates during polling.
@@ -3586,6 +3644,21 @@ export default function ChatbotPage() {
   }, [messages, isTyping])
 
   // Poll for admin status updates on the user's scheme applications.
+  // My Schemes reminder toast — slides up 15s after registration completes, repeats every 90s
+  useEffect(() => {
+    if (chatState !== S.DONE) return
+    const show = () => setMySchemeToast(true)
+    const first = setTimeout(show, 15000)
+    const repeat = setInterval(show, 90000)
+    return () => { clearTimeout(first); clearInterval(repeat) }
+  }, [chatState])
+
+  useEffect(() => {
+    if (!mySchemeToast) return
+    const hide = setTimeout(() => setMySchemeToast(false), 6000)
+    return () => clearTimeout(hide)
+  }, [mySchemeToast])
+
   // On any status/history change → red dot on the bell + notification sound
   // (+ a browser notification if the user has granted permission).
   useEffect(() => {
@@ -3642,7 +3715,7 @@ export default function ChatbotPage() {
     }
 
     check()
-    const iv = setInterval(check, 5000)
+    const iv = setInterval(check, 60000)
     const onFocus = () => { if (document.visibilityState === 'visible') check() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
@@ -4056,6 +4129,8 @@ export default function ChatbotPage() {
         referredBy: ref || null
       })
       setIsTyping(false)
+      // Save JWT so MySchemePanel's profile fetch works after page refresh
+      if (res?.token) { try { localStorage.setItem('bjp_user_token', res.token) } catch (_) {} }
       const ntCode  = res.ntCode || res.nt_code || res.bjp_code || res.referral_code || ''
       const refLink = toFrontendReferralLink(res.referral_link, ntCode)
       if (ntCode) {
@@ -4673,6 +4748,25 @@ export default function ChatbotPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── My Schemes reminder toast ── */}
+      {mySchemeToast && (
+        <div
+          className="myscheme-reminder-toast"
+          onClick={() => { setMySchemeToast(false); setSidebarOpen(true) }}
+          role="button"
+          aria-label="Open My Schemes"
+        >
+          <div className="reminder-toast-icon">
+            <i className="bi bi-grid-3x3-gap-fill" />
+          </div>
+          <div className="reminder-toast-text">
+            <div className="reminder-toast-title">{t('Want more benefits?')}</div>
+            <div className="reminder-toast-sub">{t('Add more schemes from My Schemes menu')}</div>
+          </div>
+          <i className="bi bi-chevron-right reminder-toast-arrow" />
         </div>
       )}
 

@@ -1230,6 +1230,14 @@
   }
 }
 
+@media (min-width: 600px) and (max-width: 1023px) {
+  .chatbot-app.bjp-theme .main-content-layout.single-layout {
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 0 40px rgba(0,0,0,0.12);
+  }
+}
+
 .chatbot-app.bjp-theme .left-menu-header {
   height: 64px;
   background-color: var(--color-abyss);
@@ -2179,7 +2187,7 @@
 /* ── Top-Right Notification Toast ────────────────────────── */
 .card-notification-toast {
   position: fixed !important;
-  top: 24px !important;
+  top: calc(24px + env(safe-area-inset-top, 0px)) !important;
   right: 24px !important;
   z-index: 999999 !important;
   animation: slideInRight 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
@@ -2465,3 +2473,183 @@
 
 
 
+
+
+/* ── My Schemes reminder toast ────────────────────────────── */
+.myscheme-reminder-toast {
+  position: fixed;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1B2B4B;
+  color: #fff;
+  border-radius: 18px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  z-index: 99999;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  max-width: 340px;
+  width: calc(100% - 48px);
+  animation: reminderSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  border: 1px solid rgba(201, 169, 97, 0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.myscheme-reminder-toast:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.reminder-toast-icon {
+  background: rgba(201, 169, 97, 0.2);
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #C9A961;
+  font-size: 17px;
+}
+
+.reminder-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-toast-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminder-toast-sub {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminder-toast-arrow {
+  color: #C9A961;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+@keyframes reminderSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+
+/* ── Scheme Suggestion Box ─────────────────────────────────── */
+.scheme-suggestion-box {
+  margin: 24px 16px 32px;
+  background: var(--color-surface, #f8f9fa);
+  border: 1.5px dashed rgba(201, 169, 97, 0.5);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.suggestion-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text, #1B2B4B);
+  margin-bottom: 6px;
+}
+
+.suggestion-box-sub {
+  font-size: 12.5px;
+  color: var(--color-ash, #888);
+  margin: 0 0 14px 0;
+  line-height: 1.5;
+}
+
+.suggestion-textarea {
+  width: 100%;
+  border: 1.5px solid rgba(27, 43, 75, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  background: #fff;
+  color: #1B2B4B;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+
+.suggestion-textarea:focus {
+  border-color: #C9A961;
+}
+
+.suggestion-textarea:disabled {
+  opacity: 0.6;
+}
+
+.suggestion-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.suggestion-char-count {
+  font-size: 11px;
+  color: var(--color-ash, #aaa);
+}
+
+.suggestion-send-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1B2B4B;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  font-family: inherit;
+}
+
+.suggestion-send-btn:hover:not(:disabled) {
+  background: #243b66;
+}
+
+.suggestion-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.suggestion-sent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2ecc71;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 0;
+}

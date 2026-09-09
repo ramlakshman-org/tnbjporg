@@ -107,4 +107,7 @@ export const chat = {
 
   getPublicJurisdictions: () =>
     api.get('/api/booth-president/jurisdictions'),
+
+  suggestScheme: (suggestion) =>
+    api.post('/api/schemes/suggest', { suggestion }),
 }

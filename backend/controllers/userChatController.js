@@ -345,13 +345,15 @@ const registerSchemes = async (req, res) => {
     const BJP_SCHEMES_LIST = await getSchemesCatalog();
 
     for (let sch of targetSchemes) {
-      const schemeName = String(sch);
+      const schemeKey = String(sch);
       // Look up scheme metadata in BJP_SCHEMES_LIST
       const matched = (BJP_SCHEMES_LIST || []).find(s =>
-        s.name.toLowerCase() === schemeName.toLowerCase() ||
-        schemeName.toLowerCase().includes(s.name.toLowerCase()) ||
-        (s.id && Number(schemeName) === s.id)
+        s.name.toLowerCase() === schemeKey.toLowerCase() ||
+        schemeKey.toLowerCase().includes(s.name.toLowerCase()) ||
+        (s.id && Number(schemeKey) === s.id)
       );
+      // Use the matched scheme's canonical short name; fall back to what was sent.
+      const schemeName = matched ? matched.name : schemeKey;
 
       // Check if already applied
       const existing = await SchemeApplication.findOne({

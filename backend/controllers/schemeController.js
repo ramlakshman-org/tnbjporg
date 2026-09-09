@@ -1,4 +1,5 @@
 const SchemeApplication = require('../models/SchemeApplication');
+const SchemeSuggestion = require('../models/SchemeSuggestion');
 const User = require('../models/User');
 const Scheme = require('../models/Scheme');
 
@@ -130,10 +131,37 @@ const getSchemeList = async (req, res) => {
   }
 };
 
+// @desc    Submit a scheme suggestion (user requesting a scheme not in the catalog)
+// @route   POST /api/schemes/suggest
+// @access  Private (User)
+const suggestScheme = async (req, res) => {
+  try {
+    const { suggestion } = req.body;
+    if (!suggestion || !String(suggestion).trim()) {
+      return res.status(400).json({ success: false, message: 'Please describe the scheme you are looking for.' });
+    }
+    const user = req.user;
+    await SchemeSuggestion.create({
+      userId: user._id,
+      mobile: user.mobile || '',
+      epicNo: user.epicNo || '',
+      voterName: user.voterName || '',
+      district: user.district || '',
+      assemblyName: user.assemblyName || '',
+      suggestion: String(suggestion).trim()
+    });
+    return res.status(200).json({ success: true, message: 'Thank you! Your suggestion has been received.' });
+  } catch (error) {
+    console.error('[suggestScheme Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit suggestion. Please try again.' });
+  }
+};
+
 module.exports = {
   applySchemes,
   getUserRequests,
   getSchemeList,
+  suggestScheme,
   getSchemesCatalog,
   invalidateSchemeCache,
   BJP_SCHEMES_LIST
