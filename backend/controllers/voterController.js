@@ -71,69 +71,15 @@ const searchEpic = async (req, res) => {
 
 // @desc    Confirm Voter details & complete Registration
 // @route   POST /api/voter/confirm-registration
-// @access  Public
-const confirmVoterRegistration = async (req, res) => {
-  try {
-    const { mobile, epicNo, voterName, district, assemblyNo, assemblyName, boothNo, gender, referredBy } = req.body;
-
-    if (!mobile || !epicNo || !voterName || !district || !assemblyName || !boothNo) {
-      return res.status(400).json({ success: false, message: 'Missing required voter registration details' });
-    }
-
-    const cleanMobile = mobile.trim();
-    const cleanEpic = epicNo.trim().toUpperCase();
-
-    // Verify OTP session was completed
-    const verifiedSession = await OtpSession.findOne({ mobile: cleanMobile, verified: true });
-    if (!verifiedSession) {
-      return res.status(400).json({ success: false, message: 'Mobile number not verified with OTP. Please complete OTP verification first.' });
-    }
-
-    // Check duplicate
-    let user = await User.findOne({ $or: [{ mobile: cleanMobile }, { epicNo: cleanEpic }] });
-    if (user) {
-      user.tokenVersion = (user.tokenVersion || 1) + 1;
-      await user.save();
-      const token = generateToken(user._id, user.tokenVersion);
-      return res.status(200).json({
-        success: true,
-        message: 'User already registered. Logging in...',
-        token,
-        user
-      });
-    }
-
-    // Generate unique referral code
-    const uniqueSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const referralCode = `BJP-${cleanEpic.substring(0, 4)}-${uniqueSuffix}`;
-
-    // Create user
-    user = await User.create({
-      mobile: cleanMobile,
-      epicNo: cleanEpic,
-      voterName: voterName.trim(),
-      district: district.trim(),
-      assemblyNo: assemblyNo || '',
-      assemblyName: assemblyName.trim(),
-      boothNo: boothNo.trim(),
-      gender: gender || 'Unspecified',
-      referralCode,
-      referredBy: referredBy ? referredBy.trim() : null,
-      tokenVersion: 1
-    });
-
-    const token = generateToken(user._id, user.tokenVersion || 1);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Registration confirmed successfully!',
-      token,
-      user
-    });
-  } catch (error) {
-    console.error('[confirmVoterRegistration Error]:', error);
-    return res.status(500).json({ success: false, message: 'Registration failed' });
-  }
+// @access  Disabled — legacy endpoint removed due to account-takeover vulnerability.
+//          The $or lookup (mobile OR epicNo) allowed an attacker with a verified OTP
+//          on their own mobile to receive a JWT for a different user's account by
+//          supplying that user's EPIC. Registration now goes through /api/register-schemes.
+const confirmVoterRegistration = (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'This endpoint is no longer available. Please use the current registration flow.'
+  });
 };
 
 module.exports = {

@@ -169,12 +169,11 @@ const checkMobile = async (req, res) => {
     if (!mobile) return res.status(400).json({ success: false, message: 'Mobile required' });
 
     const cleanMobile = mobile.trim();
-    const user = await User.findOne({ mobile: cleanMobile });
+    const exists = await User.exists({ mobile: cleanMobile });
 
     return res.status(200).json({
       success: true,
-      registered: !!user,
-      user: user || null
+      registered: !!exists
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
