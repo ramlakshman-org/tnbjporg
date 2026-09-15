@@ -214,7 +214,7 @@ Card always fetches fresh from `GET /api/schemes/my-requests` on every open. No 
 
 ## TASK 6 — Scheme Requests View in Super Admin Dashboard
 
-**Status:** Pending  
+**Status:** ✅ COMPLETED — Sep 15, 2026  
 **Who:** Developer (Claude + Ram)  
 **Effort:** ~1 hour (frontend only)
 
