@@ -25,6 +25,19 @@ const sendOtp = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
+    // Per-mobile cooldown — must run BEFORE deleteMany (which would clear the session).
+    // Blocks re-requests within 60s regardless of IP, protecting 2Factor SMS credits.
+    const recentSession = await OtpSession.findOne({
+      mobile: cleanMobile,
+      createdAt: { $gt: new Date(Date.now() - 60 * 1000) }
+    });
+    if (recentSession) {
+      return res.status(429).json({
+        success: false,
+        message: 'OTP already sent. Please wait 60 seconds before requesting again.'
+      });
+    }
+
     // Run the user lookup and old-session cleanup together (both local DB ops).
     const [existingUser] = await Promise.all([
       User.findOne({ mobile: cleanMobile }),
@@ -98,6 +111,12 @@ const verifyOtp = async (req, res) => {
     }
 
     if (session && session.otp !== cleanOtp && !isDevBypass) {
+      session.attempts = (session.attempts || 0) + 1;
+      if (session.attempts >= 5) {
+        await session.deleteOne();
+        return res.status(429).json({ success: false, message: 'Too many incorrect attempts. Please request a new OTP.' });
+      }
+      await session.save();
       return res.status(400).json({ success: false, message: 'Invalid OTP entered. Please try again.' });
     }
 

@@ -117,7 +117,18 @@ const epicLimiter = rateLimit({
   message: rlMessage('Too many lookups. Please slow down and try again shortly.')
 });
 
+// OTP verification — prevents brute-force guessing of 6-digit OTPs.
+// Per-IP cap; per-mobile cap (5 wrong = session destroyed) is enforced in verifyOtp controller.
+const verifyLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rlMessage('Too many verification attempts. Please wait and try again.')
+});
+
 app.use('/api/send-otp', otpLimiter);
+app.use('/api/verify-otp', verifyLimiter);
 app.use('/api/admin/login', loginLimiter);
 app.use(['/api/validate-epic', '/api/voter/search-epic'], epicLimiter);
 

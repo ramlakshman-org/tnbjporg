@@ -214,7 +214,7 @@ Card always fetches fresh from `GET /api/schemes/my-requests` on every open. No 
 
 ## TASK 6 — Scheme Requests View in Super Admin Dashboard
 
-**Status:** ✅ COMPLETED — Sep 15, 2026  
+**Status:** ✅ COMPLETED — Sep 15, 2026
 **Who:** Developer (Claude + Ram)  
 **Effort:** ~1 hour (frontend only)
 
@@ -242,5 +242,102 @@ No new endpoint needed. Add a route: `GET /api/admin/scheme-suggestions` (Super 
 - Do NOT display `mobile` in the admin view (DPDP Act 2023)
 - This view helps inform which schemes to add next (feeds directly into Task 1)
 - Users misusing the box for callback requests ("call me") is a behaviour issue, not a missing feature — no separate callback system needed
+
+---
+
+## SECURITY FIX 1 — verify-otp Brute-Force Protection
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~1 hour
+**Priority:** CRITICAL — confirmed vulnerability, zero protections on live system before fix
+
+### Problem
+`POST /api/verify-otp` had zero rate limiting. An attacker who triggered an OTP could hammer all 1,000,000 possible 6-digit codes within the 5-minute OTP window (~16,000 req/min needed — trivial with a script). Confirmed live: 50 sequential requests with an active OTP session returned zero 429s.
+
+### Three-layer fix deployed
+
+**Layer 1 — Per-IP rate limit (`verifyLimiter` in `server.js`)**
+10 requests per 10-minute window per IP. Stops single-IP brute force.
+`app.use('/api/verify-otp', verifyLimiter)` — wired alongside existing `otpLimiter`, `loginLimiter`, `epicLimiter`.
+
+**Layer 2 — Per-mobile attempt counter (`userChatController.js` + `OtpSession.js`)**
+5 wrong OTPs → session immediately deleted. No further guessing possible for that mobile.
+`attempts` field added to `OtpSession` schema (default: 0). Counter incremented on every wrong OTP; at 5, `session.deleteOne()` + HTTP 429. Survives distributed attacks (different IPs, same mobile).
+
+**Layer 3 — Existing OtpSession TTL (unchanged)**
+MongoDB TTL index expires sessions after 300 seconds regardless. Attacker window was always 5 min; now they get max 5 guesses within it.
+
+### Files changed
+- `backend/server.js` — added `verifyLimiter` (lines 120–128), mounted at line 131
+- `backend/controllers/userChatController.js` — attempt counter in `verifyOtp` wrong-OTP branch (lines 114–118)
+- `backend/models/OtpSession.js` — `attempts` field added to schema (line 29)
+
+### Test results (post-deploy)
+- Attempt 1–4: HTTP 400 "Invalid OTP entered" ✅
+- Attempt 5: HTTP 429 "Too many incorrect attempts. Please request a new OTP." ✅
+- Attempt 6+: HTTP 400 "OTP session expired" (session gone) ✅
+- `RateLimit-Limit: 10`, `RateLimit-Policy: 10;w=600` confirmed in response headers ✅
+
+### Attack surface after fix
+Attacker must know exact mobile, guess correctly within **5 tries**, within **5 minutes** of OTP dispatch. 1M-guess brute force: closed.
+
+---
+
+## TASK 7 — OTP Rate Limiting (Spam & SMS Credit Protection)
+
+**Status:** ✅ COMPLETED — Sep 16, 2026  
+**Who:** Developer (Claude + Ram)  
+**Effort:** ~30–45 min  
+**Priority:** HIGH — must fix before campaign launch
+
+### Problem
+`POST /api/send-otp` has no rate limiting. Anyone can call it in a loop with arbitrary mobile numbers, triggering a real SMS via 2Factor API on each call. 10,000 requests = 10,000 SMS credits burned. No special tools needed by the attacker — just a simple script.
+
+Current protections: **None.** The nginx `auth_limit` zone (10 req/min) only covers `/api/auth/` — the OTP endpoint is at `/api/send-otp` which is completely unprotected.
+
+### Two-layer fix
+
+**Layer 1 — nginx rate limit (per IP)**
+Add `limit_req` to the `/api/` location in `/etc/nginx/sites-available/bjptn`. Limits each IP to 10 requests/min with a burst of 3. Stops single-IP bot attacks immediately. No code change.
+
+**Layer 2 — Per-mobile cooldown in code**
+In `sendOtp` (`backend/controllers/userChatController.js`, line 17), before `OtpSession.create`, check if an OTP was already sent to this mobile in the last 60 seconds. If yes → return HTTP 429.
+Uses existing `OtpSession` collection — no new DB table or index needed.
+
+```javascript
+// Add after line 31 (after OtpSession.deleteMany)
+const recentSession = await OtpSession.findOne({
+  mobile: cleanMobile,
+  createdAt: { $gt: new Date(Date.now() - 60 * 1000) }
+});
+if (recentSession) {
+  return res.status(429).json({
+    success: false,
+    message: 'OTP already sent. Please wait 60 seconds before requesting again.'
+  });
+}
+```
+
+### Why two layers
+- Attacker from one IP → blocked by nginx (Layer 1)
+- Attacker using many IPs targeting the same mobile → blocked by per-mobile cooldown (Layer 2)
+- Real user accidentally double-tapping → clear "wait 60 seconds" message (good UX, not confusing error)
+
+### What this does NOT affect
+- Normal registration — users naturally wait >60 seconds to receive and type an OTP
+- Existing users re-logging in — same flow, same experience
+
+### Files to change
+1. `/etc/nginx/sites-available/bjptn` — add `limit_req` to `/api/` location
+2. `backend/controllers/userChatController.js` — add 6-line cooldown check after line 31
+3. On server: `nginx -t && systemctl reload nginx`
+4. On server: SCP updated controller + `pm2 restart bjptn-backend --update-env`
+
+### Test checklist after deploy
+- [ ] Call `/api/send-otp` twice within 60 seconds same mobile → second returns 429
+- [ ] Call from same IP 10 times rapidly → nginx returns 429 after burst
+- [ ] Normal registration end-to-end still works
+- [ ] Existing user re-login OTP still works
 
 ---
