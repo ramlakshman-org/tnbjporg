@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^10.74.0",
     "axios": "^1.7.9",
     "cropperjs": "^2.1.1",
     "exceljs": "^4.4.0",

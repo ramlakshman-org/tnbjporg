@@ -11,7 +11,7 @@ const getReferralStats = async (req, res) => {
 
     // Fetch L1 referred users (people this user directly referred)
     const referredUsers = await User.find({ referredBy: { $in: matchCodes } })
-      .select('_id voterName district referralCode')
+      .select('_id voterName district referralCode mobile')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -32,6 +32,8 @@ const getReferralStats = async (req, res) => {
       id: refUser._id,
       voterName: refUser.voterName,
       district: refUser.district,
+      mobile: refUser.mobile || null,
+      referralCode: refUser.referralCode,
       level2Count: l2CountMap[refUser.referralCode] || 0
     }));
 
@@ -50,6 +52,36 @@ const getReferralStats = async (req, res) => {
   }
 };
 
+// @desc    Get L2 members under a specific L1 referral code (lazy load on tap)
+// @route   GET /api/referrals/l2-members/:referralCode
+// @access  Private (User)
+const getL2Members = async (req, res) => {
+  try {
+    const { referralCode } = req.params;
+    if (!referralCode) {
+      return res.status(400).json({ success: false, message: 'Referral code required' });
+    }
+
+    const l2Users = await User.find({ referredBy: referralCode })
+      .select('_id voterName district mobile')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const members = l2Users.map(u => ({
+      id: u._id,
+      voterName: u.voterName,
+      district: u.district,
+      mobile: u.mobile || null
+    }));
+
+    return res.status(200).json({ success: true, members });
+  } catch (error) {
+    console.error('[getL2Members Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load L2 members' });
+  }
+};
+
 module.exports = {
-  getReferralStats
+  getReferralStats,
+  getL2Members
 };

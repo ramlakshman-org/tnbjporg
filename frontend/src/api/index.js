@@ -90,6 +90,9 @@ export const chat = {
   getMyReferrals: () =>
     api.get('/api/referrals/my-referrals'),
 
+  getL2Members: (referralCode) =>
+    api.get(`/api/referrals/l2-members/${referralCode}`),
+
   getMemberStatus: (ntCode) =>
     api.get(`/api/member-status/${ntCode}`),
 
@@ -110,4 +113,7 @@ export const chat = {
 
   suggestScheme: (suggestion) =>
     api.post('/api/schemes/suggest', { suggestion }),
+
+  getMySchemes: () =>
+    api.get('/api/schemes/my-requests'),
 }

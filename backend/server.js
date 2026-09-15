@@ -1,3 +1,11 @@
+const Sentry = require('@sentry/node');
+
+Sentry.init({
+  dsn: 'https://3981855d15d59ffb24e8d77b8fcd97bb@o4512071928184832.ingest.de.sentry.io/4512071953219664',
+  environment: process.env.NODE_ENV || 'production',
+  tracesSampleRate: 0.2,
+});
+
 require('express-async-errors'); // route async errors auto-forward to the global handler
 const express = require('express');
 const mongoose = require('mongoose');
@@ -237,6 +245,9 @@ const seedDefaultAdmins = async () => {
   }
 };
 
+// Sentry error handler — must be before the generic error handler
+Sentry.setupExpressErrorHandler(app);
+
 // Global Express Error Handler Middleware
 app.use((err, req, res, next) => {
   console.error('[Unhandled Global Error]:', err);
@@ -245,8 +256,8 @@ app.use((err, req, res, next) => {
   }
   res.status(err.status || 500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production' 
-      ? 'An unexpected server error occurred.' 
+    message: process.env.NODE_ENV === 'production'
+      ? 'An unexpected server error occurred.'
       : (err.message || 'Internal server error')
   });
 });

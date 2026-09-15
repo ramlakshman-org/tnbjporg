@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import QRCode from 'qrcode'
+import html2canvas from 'html2canvas'
 import { useNavigate } from 'react-router-dom'
 import { chat } from '../api'
 import '../styles/chatbot.css'
@@ -752,7 +753,7 @@ const _ARCHIVED_NT_SCHEMES_UNUSED = [
 ]
 
 // ── Scheme Info Modal ─────────────────────────────────────────
-function SchemeInfoModal({ scheme, onClose, isSelected, onToggle }) {
+function SchemeInfoModal({ scheme, onClose, isSelected, onToggle, onApply }) {
   const { t, getSchemeData } = useLang()
   if (!scheme) return null
   const schData = getSchemeData(scheme)
@@ -879,20 +880,20 @@ function SchemeInfoModal({ scheme, onClose, isSelected, onToggle }) {
         {/* Footer CTA */}
         <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
-            onClick={() => { onToggle && onToggle(); onClose(); }}
+            onClick={() => { onApply ? onApply() : (onToggle && onToggle()); onClose(); }}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               width: '100%', padding: '13px',
-              background: isSelected ? 'rgba(255,59,48,0.12)' : 'var(--color-signal-mint, #2ecc71)',
-              color: isSelected ? '#ff3b30' : '#fff',
-              border: isSelected ? '1.5px solid rgba(255,59,48,0.35)' : 'none',
+              background: 'var(--color-signal-mint, #2ecc71)',
+              color: '#fff',
+              border: 'none',
               fontWeight: 700, fontSize: 14,
               borderRadius: 10, cursor: 'pointer',
               boxSizing: 'border-box', transition: 'all 0.15s',
             }}
           >
-            <i className={`bi ${isSelected ? 'bi-x-circle' : 'bi-plus-circle-fill'}`} />
-            {isSelected ? t('Remove this Scheme') : t('Add this Scheme')}
+            <i className="bi bi-send-fill" />
+            {t('Apply this Scheme')}
           </button>
           {scheme.link && (
             <a
@@ -1030,6 +1031,11 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
           onClose={() => setInfoScheme(null)}
           isSelected={selected.has(infoScheme.id)}
           onToggle={() => toggle(infoScheme.id)}
+          onApply={() => {
+            if (submitted || !isLatest) return
+            setSubmitted(true)
+            onSubmit([infoScheme.id])
+          }}
         />
       )}
       {/* Header counter */}
@@ -1213,22 +1219,13 @@ function SchemeSelectionMsg({ isLatest, onSubmit, disabled }) {
       ))}
 
       {isLatest && !submitted && (
-        <button
-          onClick={handleSubmit}
-          disabled={selected.size === 0 || disabled}
-          style={{
-            width: '100%', padding: '13px 20px', marginTop: 6,
-            background: selected.size === 0 ? 'rgba(250,93,0,0.25)' : 'var(--color-signal-mint)',
-            color: '#fff', border: 'none', borderRadius: 12,
-            fontSize: 14, fontWeight: 700,
-            cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            transition: 'all 0.2s'
-          }}
-        >
-          <i className="bi bi-check2-circle" />
-          {t('Register & Get My Referral Link')}
-        </button>
+        <div style={{
+          fontSize: 12, color: 'var(--color-ash)',
+          textAlign: 'center', marginTop: 8, padding: '8px 0'
+        }}>
+          <i className="bi bi-hand-index-thumb" style={{ marginRight: 5 }} />
+          {t('Tap a scheme above to read details and apply')}
+        </div>
       )}
       {submitted && (
         <div style={{
@@ -2780,13 +2777,165 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
   );
 }
 
-// ── My Referrals — simple flat list of referred persons ─────────────
+// ── Contact buttons — Call + WhatsApp ────────────────────────────────
+function ContactButtons({ mobile }) {
+  if (!mobile) return null
+  const num = mobile.replace(/\D/g, '')
+  return (
+    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      <a
+        href={`tel:+91${num}`}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'rgba(46,204,113,0.12)', color: 'var(--color-signal-mint)', textDecoration: 'none', fontSize: 14 }}
+        aria-label="Call"
+      >
+        <i className="bi bi-telephone-fill" />
+      </a>
+      <a
+        href={`https://wa.me/91${num}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'rgba(37,211,102,0.12)', color: '#25d366', textDecoration: 'none', fontSize: 14 }}
+        aria-label="WhatsApp"
+      >
+        <i className="bi bi-whatsapp" />
+      </a>
+    </div>
+  )
+}
+
+// ── L2 expanded list under an L1 card ────────────────────────────────
+function L2MembersList({ referralCode }) {
+  const { t } = useLang()
+  const [l2Members, setL2Members] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    chat.getL2Members(referralCode)
+      .then((data) => setL2Members(Array.isArray(data.members) ? data.members : []))
+      .catch(() => setL2Members([]))
+      .finally(() => setLoading(false))
+  }, [referralCode])
+
+  if (loading) return (
+    <div style={{ padding: '8px 0 4px 32px', color: 'var(--color-ash)', fontSize: 12 }}>{t('Loading...')}</div>
+  )
+  if (l2Members.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {l2Members.map((u, i) => (
+        <div key={u.id || i} style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+          background: 'rgba(46,204,113,0.05)', border: '1px solid rgba(46,204,113,0.15)',
+          borderRadius: 10, marginLeft: 12
+        }}>
+          <i className="bi bi-arrow-return-right" style={{ color: 'var(--color-signal-mint)', fontSize: 11, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.voterName || 'BJP Member'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 1 }}>
+              <i className="bi bi-geo-alt" style={{ marginRight: 3 }} />{u.district || '—'}
+            </div>
+          </div>
+          <ContactButtons mobile={u.mobile} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Check Eligibility panel (standalone menu view) ───────────────────
+function EligibilityPanel({ onBack }) {
+  const { t, getSchemeData } = useLang()
+  const [ticked, setTicked] = useState(new Set())
+  const NT_SCHEMES = useMergedSchemes(NT_SCHEMES_STATIC, adaptToNtShape)
+
+  const toggle = (key) => setTicked(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    return next
+  })
+
+  const isEligible = (schemeId) => {
+    const req = SCHEME_DOC_MAP[Number(schemeId)]
+    if (!req) return true
+    return req.every(d => ticked.has(d))
+  }
+  const eligible = ticked.size > 0 ? NT_SCHEMES.filter(s => isEligible(s.id)) : []
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-pitch, #0f1117)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+          <i className="bi bi-chevron-left" style={{ fontSize: 18 }} />
+        </button>
+        <i className="bi bi-card-checklist" style={{ color: '#f97316', fontSize: 18 }} />
+        <span style={{ fontWeight: 600, fontSize: 15, color: '#ffffff' }}>{t('Check Eligibility')}</span>
+      </header>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#f97316', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {t('Which documents do you have?')}
+          </div>
+          {ELIGIBILITY_DOCS.map(({ key, label }) => {
+            const checked = ticked.has(key)
+            return (
+              <div
+                key={key}
+                onClick={() => toggle(key)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                  background: checked ? '#f97316' : 'transparent',
+                  border: `1.5px solid ${checked ? '#f97316' : 'rgba(255,255,255,0.25)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s'
+                }}>
+                  {checked && <i className="bi bi-check" style={{ fontSize: 12, color: '#fff', lineHeight: 1 }} />}
+                </div>
+                <span style={{ fontSize: 13, color: checked ? '#f1f1ef' : 'rgba(241,241,239,0.6)' }}>{t(label)}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {ticked.size > 0 && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#f97316', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {eligible.length > 0
+                ? `${t('Eligible schemes')} — ${eligible.length}`
+                : t('No schemes match yet — tick more documents')}
+            </div>
+            {eligible.map(s => {
+              const sd = getSchemeData(s)
+              return (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 6, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                  <i className="bi bi-check-circle-fill" style={{ color: '#22c55e', fontSize: 14, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: '#f1f1ef', fontWeight: 500 }}>{sd.title || sd.name_en || s.name_en || s.id}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {ticked.size === 0 && (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(241,241,239,0.4)', fontSize: 13 }}>
+            {t('Tick the documents you have above to see eligible schemes')}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── My Referrals — list with Call/WhatsApp + expandable L2 ───────────
 function MyReferralsListPanel({ bjpCode, onBack }) {
   const { t } = useLang()
   const [members, setMembers] = useState([])
   const [networkStats, setNetworkStats] = useState({ totalDirect: 0, totalNetwork: 0, totalImpact: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
     if (!bjpCode) {
@@ -2810,12 +2959,7 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
       .finally(() => setLoading(false))
   }, [bjpCode])
 
-  const fmtJoin = (d) => {
-    if (!d) return ''
-    try {
-      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    } catch { return '' }
-  }
+  const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id)
 
   return (
     <div className="chatbot-container brochure-panel">
@@ -2871,25 +3015,38 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
                 const name = m.voterName || m.name || 'BJP Member'
                 const district = m.district || '—'
                 const level2 = m.level2Count || 0
+                const cardId = m.id || m._id || idx
+                const isExpanded = expandedId === cardId
+                const hasL2 = level2 > 0 && m.referralCode
                 return (
-                  <div key={m._id || m.epicNo || m.bjp_code || idx} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                  <div key={cardId} style={{
+                    padding: '12px 14px',
                     background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 14
                   }}>
-                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(46,204,113,0.12)', color: 'var(--color-signal-mint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
-                      {idx + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2 }}>
-                        <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />{district}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(46,204,113,0.12)', color: 'var(--color-signal-mint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+                        {idx + 1}
                       </div>
-                      {level2 > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--color-signal-mint)', marginTop: 3, fontWeight: 600 }}>
-                          ↳ {t('Brought')} {level2} {level2 === 1 ? t('more person') : t('more people')}
+                      <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2 }}>
+                          <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />{district}
                         </div>
-                      )}
+                        {hasL2 && (
+                          <button
+                            onClick={() => toggleExpand(cardId)}
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: 'var(--color-signal-mint)', fontWeight: 600, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            ↳ {t('Brought')} {level2} {level2 === 1 ? t('more person') : t('more people')}
+                            <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
+                          </button>
+                        )}
+                      </div>
+                      <ContactButtons mobile={m.mobile} />
                     </div>
+                    {hasL2 && isExpanded && (
+                      <L2MembersList referralCode={m.referralCode} />
+                    )}
                   </div>
                 )
               })
@@ -2898,6 +3055,218 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
         )}
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
+// ── Scheme Welfare Card ──────────────────────────────────────────────
+function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
+  const { t, getSchemeData } = useLang()
+  const NT_SCHEMES = useMergedSchemes(NT_SCHEMES_STATIC, adaptToNtShape)
+  const [schemes, setSchemes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const cardDivRef = useRef(null)
+  const qrCanvasRef = useRef(null)
+
+  const name = card?.voter_name || 'BJP Member'
+  const bjpCode = card?.bjp_code || ''
+  const district = voter?.district || voter?.DISTRICT || ''
+  const assemblyName = voter?.assembly_name || voter?.assembly || voter?.assemblyName || voter?.ASSEMBLY_NAME || ''
+  const referralUrl = toFrontendReferralLink(card?.referral_link, bjpCode) || 'https://tnbjp.org'
+
+  useEffect(() => {
+    chat.getMySchemes()
+      .then(res => setSchemes(res?.applications || []))
+      .catch(() => setSchemes([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!referralUrl || !qrCanvasRef.current) return
+    QRCode.toCanvas(qrCanvasRef.current, referralUrl, {
+      width: 72, margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    }, () => {})
+  }, [referralUrl, loading])
+
+  const resolveSchemeDisplay = (app) => {
+    const num = parseInt(String(app.schemeId || '').trim(), 10)
+    const matched = num ? NT_SCHEMES.find(s => s.id === num) : null
+    if (matched) {
+      const sd = getSchemeData(matched)
+      return sd?.title || sd?.name_en || matched.name_en || app.schemeName || 'Scheme'
+    }
+    return app.schemeName || 'Scheme'
+  }
+
+  const handleDownload = async () => {
+    if (!cardDivRef.current || downloading) return
+    setDownloading(true)
+    try {
+      const canvas = await html2canvas(cardDivRef.current, { scale: 2, useCORS: true, backgroundColor: '#0f1117' })
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `bjp-welfare-card-${bjpCode || 'member'}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+      }, 'image/png', 1.0)
+    } catch (_) {}
+    finally { setDownloading(false) }
+  }
+
+  const handleWhatsAppShare = () => {
+    const schemeList = schemes.map(s => `• ${resolveSchemeDisplay(s)}`).join('\n')
+    const locationLine = [district, assemblyName].filter(Boolean).join(' · ')
+    const shareText = [
+      `🪷 *BJP Nalam Thittam — Welfare Card*`,
+      ``,
+      `*${name}*`,
+      locationLine,
+      ``,
+      `*Applied Schemes:*`,
+      schemeList || t('None yet'),
+      ``,
+      `*Join here:* ${referralUrl}`
+    ].join('\n')
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-pitch, #0f1117)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex' }}>
+          <i className="bi bi-chevron-left" style={{ fontSize: 18 }} />
+        </button>
+        <i className="bi bi-credit-card-2-front" style={{ color: '#f97316', fontSize: 18 }} />
+        <span style={{ fontWeight: 600, fontSize: 15, color: '#ffffff' }}>{t('My Welfare Card')}</span>
+      </header>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+            <div style={{ width: 24, height: 24, border: '3px solid rgba(249,115,22,0.3)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : (
+          <>
+            {/* CR80 portrait card — saffron poster style */}
+            <div ref={cardDivRef} style={{
+              width: 300, flexShrink: 0,
+              aspectRatio: '9 / 16',
+              borderRadius: 20, overflow: 'hidden',
+              border: '3px solid #f76201',
+              boxShadow: '0 12px 36px rgba(247,98,1,0.4)',
+              background: 'linear-gradient(165deg, #f76201 0%, #d85400 100%)',
+              marginBottom: 20,
+              display: 'flex', flexDirection: 'column',
+              justifyContent: 'space-between',
+              padding: '14px 12px',
+              boxSizing: 'border-box',
+              position: 'relative',
+              color: '#fff',
+            }}>
+              {/* Top tricolor bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, display: 'flex', zIndex: 10 }}>
+                <div style={{ flex: 1, background: '#ffffff' }} />
+                <div style={{ flex: 1, background: '#138808' }} />
+              </div>
+
+              {/* Lotus watermark */}
+              <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.07, pointerEvents: 'none', zIndex: 0 }}>
+                <svg viewBox="0 0 141 151" width="220" height="220">
+                  <path fill="#FFFFFF" d="m19.4 88.3c-1.1-1.8-0.9-3.4-0.3-5.1 1.4-3.7 4.2-6.2 7.3-8.3 0.4-0.2 0.7-0.5 0.9-0.6-2.1-1.5-4.5-2.8-6.5-4.6-5.1-4.6-7.9-10.6-9.8-17-1.8-5.9-2.4-12.1-2.4-18.2 0-7.7-1.7-15.1-5.3-21.9-1.1-2-2.4-3.9-3.7-5.9 1.4-1.3 3.2-1.5 5-1.5 5.7-0.1 10.9 1.6 15.8 4.4 5.1 3 9.2 7 12.6 11.7 0.2 0.3 0.5 0.6 0.8 1 2.3-7.3-1.5-12.6-5.3-18 2-1.2 4.1-0.9 6.1-0.6 7.6 1.1 13.7 5 18.7 10.6 1.9 2.1 3.4 4.5 5 6.8 0.3 0.3 0.5 0.7 0.5 0.8 4.3-7.2 8.5-14.4 13-22 4.8 6.1 7.8 12.6 10.8 18.9 2.4-2.7 4.8-5.5 7.4-8 3.8-3.6 8.2-6.3 13.2-7.7 2.7-0.7 4.2-0.7 7 0.3-3.4 6.1-4.8 12.5-3.1 19.3 1.4-1.9 2.7-4 4.3-5.8 5.3-6.2 11.7-10.4 19.9-11.7 2.4-0.4 4.9-0.6 7.2 0.1 0.7 0.2 1.4 0.6 2.3 1-0.4 0.5-0.7 0.8-1 1.1-4.4 5-7.3 10.6-7.5 17.4-0.1 3.8 0.2 7.6 0.5 11.4 0.6 8-0.1 15.7-3.5 23.1-2.4 5.3-5.8 9.9-10.1 13.9-0.1 0.1-0.3 0.3-0.4 0.4-0.1 0.1-0.1 0.1-0.1 0.2 4.2 3.8 8 7.7 6 14.3-0.8-0.5-1.4-0.9-2-1.3-1.6-1.1-3.3-1.3-5.1-0.7-2.9 0.8-5.3 2.5-7.5 4.4-3 2.7-6.4 4.5-10.4 5.2-3.8 0.7-7.6 0.5-11.3-1-0.4-0.2-0.9-0.2-1.3-0.1-6.3 1.4-10.8 7-10.7 13 0.1 6.8-0.3 13.6-2.1 20.2-0.7 2.4-1.7 4.6-2.6 6.9q2.7-0.3 5.7-0.6c0.6-0.1 1.2-0.2 1.8 0 1 0.2 1.3 1 1.1 2-0.2 1.1-1.1 2-1.9 2-2.7-0.1-5.4-0.2-8.1-0.1-1.7 0-1.9-1.4-2.6-2.3-0.7-0.8 0-1.3 0.4-1.9 2-2.9 2.9-6.2 3.3-9.7 0.6-4.9 0.9-9.8 1.2-14.7 0.1-1.5-0.4-2-2.1-2.3 0 0.5-0.1 1-0.1 1.5 0 5.4 0 10.7-1.1 16-0.9 4.1-2.2 7.9-5.3 10.9-3.2 3.1-7.2 4.1-11.5 4-2.1-0.1-4.3-0.3-6.4-0.8-2.1-0.5-2.4-2.2-0.8-3.7 1.6-1.6 3.6-1.9 5.8-1.8 2.9 0.2 5.9 0.5 8.8 0.8 1 0.1 1.5-0.3 2-1.1 3.2-4.7 4.7-10 5.2-15.6 0.3-4.4 0.1-8.8-1.6-13-1.2-2.9-3-5.2-5.8-6.8-1.9-1.1-3.7-2.3-5.6-3.4-0.3-0.2-0.8-0.3-1-0.2-4 1.9-8 1.4-12 0.3-2.8-0.8-5.2-2.2-7.5-3.9-2.5-1.8-5.2-3.2-8.2-3.7-2.1-0.1 4.0 0.4-6 1.7zm37.5 47.4c-1.1 0.1-2.2 0.3-3.2 0.4-1.5 0.1-2.7-0.5-4.2 0-0.2 0.1-0.9 0.3-0.9 0.6 0 0.2 0.2 0.4 0.8 0.6 1.3 0.4 2.2 0.1 5.4 0 1.1 0 1.8-0.5 2.1-1.6z" />
+                </svg>
+              </div>
+
+              {/* Header — white panel island */}
+              <div style={{ background: '#fff', borderRadius: 14, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 14px rgba(0,0,0,0.15)', zIndex: 1, flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, background: '#fff7ed', borderRadius: '50%', border: '1px solid #ffe4d6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <img src="/bjp_logo.svg" alt="BJP" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display = 'none' }} />
+                </div>
+                <div style={{ textAlign: 'center', flex: 1, padding: '0 6px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', color: '#f76201', textTransform: 'uppercase', lineHeight: 1.2 }}>BJP Nalam Thittam</div>
+                  <div style={{ fontSize: 8.5, fontWeight: 700, color: '#475569', marginTop: 1 }}>நலம் திட்டம் — Welfare Card</div>
+                </div>
+                <div style={{ width: 32 }} />
+              </div>
+
+              {/* Schemes — white panel island */}
+              <div style={{ background: '#fff', borderRadius: 14, padding: '10px 12px', flex: 1, margin: '10px 0', boxShadow: '0 6px 18px rgba(0,0,0,0.15)', zIndex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+                {/* Lotus watermark inside white panel */}
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.18, pointerEvents: 'none' }}>
+                  <svg viewBox="0 0 141 151" width="200" height="200">
+                    <path fill="#f76201" d="m19.4 88.3c-1.1-1.8-0.9-3.4-0.3-5.1 1.4-3.7 4.2-6.2 7.3-8.3 0.4-0.2 0.7-0.5 0.9-0.6-2.1-1.5-4.5-2.8-6.5-4.6-5.1-4.6-7.9-10.6-9.8-17-1.8-5.9-2.4-12.1-2.4-18.2 0-7.7-1.7-15.1-5.3-21.9-1.1-2-2.4-3.9-3.7-5.9 1.4-1.3 3.2-1.5 5-1.5 5.7-0.1 10.9 1.6 15.8 4.4 5.1 3 9.2 7 12.6 11.7 0.2 0.3 0.5 0.6 0.8 1 2.3-7.3-1.5-12.6-5.3-18 2-1.2 4.1-0.9 6.1-0.6 7.6 1.1 13.7 5 18.7 10.6 1.9 2.1 3.4 4.5 5 6.8 0.3 0.3 0.5 0.7 0.5 0.8 4.3-7.2 8.5-14.4 13-22 4.8 6.1 7.8 12.6 10.8 18.9 2.4-2.7 4.8-5.5 7.4-8 3.8-3.6 8.2-6.3 13.2-7.7 2.7-0.7 4.2-0.7 7 0.3-3.4 6.1-4.8 12.5-3.1 19.3 1.4-1.9 2.7-4 4.3-5.8 5.3-6.2 11.7-10.4 19.9-11.7 2.4-0.4 4.9-0.6 7.2 0.1 0.7 0.2 1.4 0.6 2.3 1-0.4 0.5-0.7 0.8-1 1.1-4.4 5-7.3 10.6-7.5 17.4-0.1 3.8 0.2 7.6 0.5 11.4 0.6 8-0.1 15.7-3.5 23.1-2.4 5.3-5.8 9.9-10.1 13.9-0.1 0.1-0.3 0.3-0.4 0.4-0.1 0.1-0.1 0.1-0.1 0.2 4.2 3.8 8 7.7 6 14.3-0.8-0.5-1.4-0.9-2-1.3-1.6-1.1-3.3-1.3-5.1-0.7-2.9 0.8-5.3 2.5-7.5 4.4-3 2.7-6.4 4.5-10.4 5.2-3.8 0.7-7.6 0.5-11.3-1-0.4-0.2-0.9-0.2-1.3-0.1-6.3 1.4-10.8 7-10.7 13 0.1 6.8-0.3 13.6-2.1 20.2-0.7 2.4-1.7 4.6-2.6 6.9q2.7-0.3 5.7-0.6c0.6-0.1 1.2-0.2 1.8 0 1 0.2 1.3 1 1.1 2-0.2 1.1-1.1 2-1.9 2-2.7-0.1-5.4-0.2-8.1-0.1-1.7 0-1.9-1.4-2.6-2.3-0.7-0.8 0-1.3 0.4-1.9 2-2.9 2.9-6.2 3.3-9.7 0.6-4.9 0.9-9.8 1.2-14.7 0.1-1.5-0.4-2-2.1-2.3 0 0.5-0.1 1-0.1 1.5 0 5.4 0 10.7-1.1 16-0.9 4.1-2.2 7.9-5.3 10.9-3.2 3.1-7.2 4.1-11.5 4-2.1-0.1-4.3-0.3-6.4-0.8-2.1-0.5-2.4-2.2-0.8-3.7 1.6-1.6 3.6-1.9 5.8-1.8 2.9 0.2 5.9 0.5 8.8 0.8 1 0.1 1.5-0.3 2-1.1 3.2-4.7 4.7-10 5.2-15.6 0.3-4.4 0.1-8.8-1.6-13-1.2-2.9-3-5.2-5.8-6.8-1.9-1.1-3.7-2.3-5.6-3.4-0.3-0.2-0.8-0.3-1-0.2-4 1.9-8 1.4-12 0.3-2.8-0.8-5.2-2.2-7.5-3.9-2.5-1.8-5.2-3.2-8.2-3.7-2.1-0.1 4.0 0.4-6 1.7zm37.5 47.4c-1.1 0.1-2.2 0.3-3.2 0.4-1.5 0.1-2.7-0.5-4.2 0-0.2 0.1-0.9 0.3-0.9 0.6 0 0.2 0.2 0.4 0.8 0.6 1.3 0.4 2.2 0.1 5.4 0 1.1 0 1.8-0.5 2.1-1.6z" />
+                  </svg>
+                </div>
+                <div style={{ fontSize: 9, fontWeight: 800, color: '#f76201', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  {t('Applied Schemes')} / விண்ணப்பித்த திட்டங்கள்
+                </div>
+                {schemes.length === 0 ? (
+                  <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <i className="bi bi-inbox" style={{ fontSize: 24, color: '#cbd5e1', display: 'block' }} />
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{t("You haven't applied for any schemes yet.")}</div>
+                    <button onClick={onApplySchemes} style={{ background: '#f76201', color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                      {t('Apply Now')} →
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {schemes.map((app, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <span style={{ color: '#f76201', fontSize: 10, flexShrink: 0, marginTop: 2 }}>✦</span>
+                        <span style={{ fontSize: 11.5, color: '#0f172a', lineHeight: 1.4, fontWeight: 500 }}>{resolveSchemeDisplay(app)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Identity + QR — white panel island */}
+              <div style={{ background: '#fff', borderRadius: 14, padding: '10px 12px', boxShadow: '0 6px 18px rgba(0,0,0,0.15)', zIndex: 1, flexShrink: 0 }}>
+                <div style={{ marginBottom: 8, borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 0.5 }}>{name}</div>
+                  {(district || assemblyName) && (
+                    <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>
+                      {[district, assemblyName].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <canvas ref={qrCanvasRef} style={{ borderRadius: 4, flexShrink: 0, border: '1px solid #f1f5f9' }} />
+                  <div>
+                    <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 2 }}>{t('Scan to join')}</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#f76201', letterSpacing: 1 }}>{bjpCode}</div>
+                    <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>tnbjp.org</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom tricolor strip */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 5, display: 'flex', zIndex: 10 }}>
+                <div style={{ flex: 1, background: '#f97316' }} />
+                <div style={{ flex: 1, background: '#ffffff' }} />
+                <div style={{ flex: 1, background: '#138808' }} />
+              </div>
+            </div>
+
+            {/* Action buttons — full width below card */}
+            {schemes.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 340 }}>
+                <button onClick={handleWhatsAppShare} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: '#25d366', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                  <i className="bi bi-whatsapp" /> {t('Share on WhatsApp')}
+                </button>
+                <button onClick={handleDownload} disabled={downloading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: '1px solid rgba(249,115,22,0.4)', background: 'rgba(249,115,22,0.08)', color: '#f97316', fontSize: 14, fontWeight: 600, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1 }}>
+                  <i className="bi bi-download" /> {downloading ? t('Downloading...') : t('Download Card')}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -3876,7 +4245,11 @@ export default function ChatbotPage() {
       if (urlRef) {
         addMsg('bot', 'text', { text: '⚠️ *You are already registered!* Your schemes are active.', i18nKey: true })
       } else {
-        addMsg('bot', 'text', { text: '👋 Welcome back to *Nalam Thittam!*', i18nKey: true })
+        const wbName = cache.card.voter_name ? cache.card.voter_name.split(' ')[0] : ''
+        const wbText = wbName
+          ? `👋 Welcome back, *${wbName}!* Your registration is active. Open *My Schemes* to view or add schemes.`
+          : `👋 Welcome back to *Nalam Thittam!* Open *My Schemes* to view or add schemes.`
+        addMsg('bot', 'text', { text: wbText, i18nKey: false })
       }
       setTimeout(() => {
         const cachedRefLink = toFrontendReferralLink(cache.card.referral_link, cache.card.bjp_code)
@@ -4150,6 +4523,7 @@ export default function ChatbotPage() {
         addMsg('bot', 'referral_link', { link: refLink })
       }
       setChatState(S.DONE)
+      setActiveView('my_card')
     } catch (err) {
       setIsTyping(false)
       await botSay(`❌ ${err.message || t('Registration failed. Please try again.')}`, 200)
@@ -4178,6 +4552,14 @@ export default function ChatbotPage() {
     }
     if (action === 'be_booth_president') {
       setActiveView('be_booth_president')
+      return
+    }
+    if (action === 'my_card') {
+      setActiveView('my_card')
+      return
+    }
+    if (action === 'check_eligibility') {
+      setActiveView('check_eligibility')
       return
     }
     setActiveView('chat')
@@ -4470,10 +4852,12 @@ export default function ChatbotPage() {
 
             {[
               { icon: 'person-circle',  label: 'My Profile',              action: 'profile',     desc: 'View your registration details' },
-              { icon: 'check2-all',     label: 'My Schemes',              action: 'my_schemes',  desc: 'Schemes you registered for' },
-              { icon: 'link-45deg',     label: 'Referral Link',           action: 'referral',    desc: 'Share and invite others' },
-              { icon: 'people-fill',    label: 'My Referrals',            action: 'my_referrals',desc: 'Members you referred' },
-              { icon: 'award-fill', label: 'Be a Booth President', action: 'be_booth_president', desc: 'Apply to lead your electoral booth' },
+              { icon: 'check2-all',          label: 'My Schemes',        action: 'my_schemes',        desc: 'Schemes you registered for' },
+              { icon: 'credit-card-2-front', label: 'My Card',           action: 'my_card',           desc: 'Your scheme welfare card' },
+              { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral',          desc: 'Share and invite others' },
+              { icon: 'people-fill',         label: 'My Referrals',      action: 'my_referrals',      desc: 'Members you referred' },
+              { icon: 'card-checklist',      label: 'Check Eligibility', action: 'check_eligibility', desc: 'See which schemes you qualify for' },
+              { icon: 'award-fill',     label: 'Be a Booth President',     action: 'be_booth_president', desc: 'Apply to lead your electoral booth' },
             ].map((item) => {
               const locked = !isDone
               return (
@@ -4532,10 +4916,19 @@ export default function ChatbotPage() {
               onBack={() => setActiveView('chat')}
             />
           ) : activeView === 'my_members' || activeView === 'my_referrals' ? (
-            <MyReferralsListPanel 
+            <MyReferralsListPanel
               bjpCode={cardRef.current?.bjp_code || cardRef.current?.ptc_code || profileRef.current?.bjp_code || profileRef.current?.ptc_code}
-              onBack={() => setActiveView('chat')} 
+              onBack={() => setActiveView('chat')}
             />
+          ) : activeView === 'my_card' ? (
+            <SchemeWelfareCard
+              card={cardRef.current}
+              voter={voterRef.current || profileRef.current}
+              onBack={() => setActiveView('chat')}
+              onApplySchemes={() => setActiveView('my_schemes')}
+            />
+          ) : activeView === 'check_eligibility' ? (
+            <EligibilityPanel onBack={() => setActiveView('chat')} />
           ) : (
             <div className="chatbot-container">
 
@@ -4721,9 +5114,11 @@ export default function ChatbotPage() {
             <nav className="sidebar-nav">
               {[
                 { icon: 'person-circle',       label: 'My Profile',              action: 'profile' },
-                { icon: 'check2-all',          label: 'My Schemes',              action: 'my_schemes' },
-                { icon: 'link-45deg',          label: 'Referral Link',           action: 'referral' },
-                { icon: 'people-fill',         label: 'My Referrals',            action: 'my_referrals' },
+                { icon: 'check2-all',          label: 'My Schemes',        action: 'my_schemes' },
+                { icon: 'credit-card-2-front', label: 'My Card',           action: 'my_card' },
+                { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral' },
+                { icon: 'people-fill',         label: 'My Referrals',      action: 'my_referrals' },
+                { icon: 'card-checklist',      label: 'Check Eligibility', action: 'check_eligibility' },
                 { icon: 'award-fill',          label: 'Be a Booth President',    action: 'be_booth_president' },
               ].map((item) => {
                 return (
