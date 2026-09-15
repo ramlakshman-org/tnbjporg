@@ -245,6 +245,53 @@ No new endpoint needed. Add a route: `GET /api/admin/scheme-suggestions` (Super 
 
 ---
 
+## SECURITY FIX 3 — check-mobile PII Disclosure
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~10 min
+**Priority:** HIGH — unauthenticated voter PII enumeration at unlimited rate
+
+### Problem
+`POST /api/check-mobile` returned the full user document (voterName, epicNo, district, assemblyName, boothNo, gender, referralCode, referredBy) to any unauthenticated caller with zero rate limiting. 20 sequential requests completed in 2.4 seconds in testing. A political opponent or data harvester with a list of mobile numbers could silently enumerate all BJP registration data for every voter on that list. DPDP Act 2023 exposure.
+
+### Fix
+`userChatController.js` — replaced `User.findOne()` returning the full document with `User.exists()` returning a boolean. Response is now `{ registered: true/false }` only. No user data in the response under any circumstance.
+
+Also switched from `findOne` to `exists` — faster (no document projection/transfer), less memory.
+
+### Files changed
+- `backend/controllers/userChatController.js` — `checkMobile` function (lines 164–182)
+
+### Test result
+`{"success":true,"registered":false}` — no user object, no PII ✅
+
+---
+
+## SECURITY FIX 2 — confirm-registration Account Takeover
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~15 min
+**Priority:** CRITICAL — full account takeover, exploited live in pen test
+
+### Problem
+`POST /api/voter/confirm-registration` (legacy endpoint) looked up the user by `$or [{ mobile: attackerMobile }, { epicNo: victimEPIC }]`. An attacker who verified OTP on their own mobile could supply a victim's EPIC number and receive a valid JWT for the victim's account. Side effect: victim's tokenVersion was incremented, immediately revoking all their active sessions (victim gets logged out as attacker logs in).
+
+**Exploited live during pen test:** attacker mobile `9111111117` + victim EPIC `TESTEPIC001` → server returned victim's token + profile with message "User already registered. Logging in..."
+
+### Fix
+Endpoint disabled — returns HTTP 410 Gone immediately. No database queries run. All registration goes through `POST /api/register-schemes` which uses only the verified OTP session mobile and does not have this vulnerability.
+
+### Files changed
+- `backend/controllers/voterController.js` — `confirmVoterRegistration` replaced with one-line 410 response
+
+### Test result
+`HTTP 410 {"success":false,"message":"This endpoint is no longer available..."}` ✅
+Zero real-user traffic on this endpoint (confirmed from nginx logs before fixing).
+
+---
+
 ## SECURITY FIX 1 — verify-otp Brute-Force Protection
 
 **Status:** ✅ COMPLETED — Sep 16, 2026
