@@ -211,3 +211,36 @@ Card always fetches fresh from `GET /api/schemes/my-requests` on every open. No 
 - Two npm installs needed in `frontend/`: `qrcode.react`, `html2canvas`
 
 ---
+
+## TASK 6 — Scheme Requests View in Super Admin Dashboard
+
+**Status:** Pending  
+**Who:** Developer (Claude + Ram)  
+**Effort:** ~1 hour (frontend only)
+
+### Background
+Users can submit free-text scheme suggestions via the "Looking for a scheme not listed here?" box at the bottom of the Schemes view. These are saved to MongoDB (`schemesuggestions` collection) but currently have no visibility in the admin panel — they sit in the DB unseen.
+
+As of Sep 15, 2026: **10 submissions** exist. Investigation found most are "call me" type noise; 1 genuine scheme request ("I need CGTSME"). Admin visibility is needed to triage these.
+
+### What to build
+A **"Scheme Requests"** read-only section in the **Super Admin dashboard only** (not district/assembly/booth — they cannot add schemes and cannot act on suggestions).
+
+**Display:**
+- Top requested scheme names grouped + counted (e.g. "I need CGTSME — 1 request")
+- District breakdown showing where requests are coming from
+- Raw list of recent 20–30 submissions: submission text + district + assembly (no mobile, DPDP-safe)
+
+### Why Super Admin only
+Only the Super Admin can act on suggestions — they're the one who goes to Schemes Management → Add Scheme. Showing suggestions to district/booth admins who cannot add schemes is noise without action.
+
+### Backend
+No new endpoint needed. Add a route: `GET /api/admin/scheme-suggestions` (Super Admin access only) that returns aggregated + raw suggestion data from the `SchemeSuggestion` model.
+
+### Notes
+- `SchemeSuggestion` model already exists: stores `suggestion`, `userId`, `mobile`, `epicNo`, `voterName`, `district`, `assemblyName`
+- Do NOT display `mobile` in the admin view (DPDP Act 2023)
+- This view helps inform which schemes to add next (feeds directly into Task 1)
+- Users misusing the box for callback requests ("call me") is a behaviour issue, not a missing feature — no separate callback system needed
+
+---

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const SchemeApplication = require('../models/SchemeApplication');
+const SchemeSuggestion = require('../models/SchemeSuggestion');
 const { BJP_SCHEMES } = require('../constants/schemes');
 
 // Resolve a stored schemeName (often the numeric scheme id, since the chatbot
@@ -2037,6 +2038,43 @@ const deleteMember = async (req, res) => {
   }
 };
 
+// @desc    Get scheme suggestions submitted by users (Super Admin only)
+// @route   GET /api/admin/scheme-suggestions
+// @access  Private (SUPER_ADMIN)
+const getSchemeSuggestions = async (req, res) => {
+  try {
+    const [total, topRequests, byDistrict, recent] = await Promise.all([
+      SchemeSuggestion.countDocuments(),
+
+      SchemeSuggestion.aggregate([
+        { $group: { _id: '$suggestion', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+        { $project: { _id: 0, suggestion: '$_id', count: 1 } }
+      ]),
+
+      SchemeSuggestion.aggregate([
+        { $match: { district: { $nin: [null, ''] } } },
+        { $group: { _id: '$district', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+        { $project: { _id: 0, district: '$_id', count: 1 } }
+      ]),
+
+      SchemeSuggestion.find()
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .select('suggestion voterName district assemblyName createdAt')
+        .lean()
+    ]);
+
+    return res.status(200).json({ success: true, total, topRequests, byDistrict, recent });
+  } catch (error) {
+    console.error('[getSchemeSuggestions Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load scheme suggestions' });
+  }
+};
+
 module.exports = {
   adminLogin,
   warmStatsCache,
@@ -2059,5 +2097,6 @@ module.exports = {
   getMapAnalytics,
   getTrends,
   getCoverage,
-  deleteMember
+  deleteMember,
+  getSchemeSuggestions
 };

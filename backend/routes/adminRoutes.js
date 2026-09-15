@@ -20,7 +20,8 @@ const {
   getMapAnalytics,
   getTrends,
   getCoverage,
-  deleteMember
+  deleteMember,
+  getSchemeSuggestions,
 } = require('../controllers/adminController');
 const {
   getAllSchemesAdmin,
@@ -55,6 +56,7 @@ router.get('/credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllAd
 
 // ── Member management (SUPER_ADMIN only) ──
 router.delete('/members/:userId', protectAdmin, authorizeRoles('SUPER_ADMIN'), deleteMember);
+router.get('/scheme-suggestions', protectAdmin, authorizeRoles('SUPER_ADMIN'), getSchemeSuggestions);
 
 // ── Scheme management (SUPER_ADMIN only) ──
 router.get('/schemes', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllSchemesAdmin);

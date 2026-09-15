@@ -35,6 +35,9 @@ const SuperAdminDashboard = () => {
   const [statsData, setStatsData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
 
+  // ── Scheme Suggestions ──
+  const [suggestionsData, setSuggestionsData] = useState(null);
+
   // ── Credentials State ──
   const [adminList, setAdminList] = useState([]);
   const [credSubTab, setCredSubTab] = useState('districts');
@@ -162,6 +165,15 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const fetchSuggestions = async () => {
+    try {
+      const res = await API.get('/admin/scheme-suggestions');
+      if (res.data.success) setSuggestionsData(res.data);
+    } catch (err) {
+      console.error('Error loading scheme suggestions:', err);
+    }
+  };
+
   // ── Fetch Paginated Voters ──
   const fetchVoters = async (page = 1) => {
     try {
@@ -230,6 +242,7 @@ const SuperAdminDashboard = () => {
     fetchInitialMeta();
     fetchStats();
     fetchLoginsAndCreds();
+    fetchSuggestions();
   }, []);
 
   useEffect(() => {
@@ -664,6 +677,95 @@ const SuperAdminDashboard = () => {
               />
             </ErrorBoundary>
 
+            {/* ── Scheme Requests ── */}
+            {suggestionsData && (
+              <div className="campsite-card" style={{ width: '100%', padding: '28px', marginTop: '28px', boxSizing: 'border-box', borderRadius: '28px', backgroundColor: '#ffffff', border: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ fontFamily: 'var(--font-sf-pro-display)', fontSize: '24px', fontWeight: '600', color: 'var(--color-primary-ink)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.007em' }}>
+                      <FileText size={22} color="var(--color-electric-blue)" />
+                      Scheme Requests
+                    </h3>
+                    <div style={{ fontSize: '14px', color: 'var(--color-mid-gray)', marginTop: '4px' }}>
+                      Schemes users are asking for that are not yet in the catalog
+                    </div>
+                  </div>
+                  <span className="tag-pill tag-active" style={{ fontSize: '13px', background: 'var(--color-canvas)', color: 'var(--color-primary-ink)' }}>
+                    {suggestionsData.total} total request{suggestionsData.total !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                {suggestionsData.total === 0 ? (
+                  <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-mid-gray)', background: 'var(--color-canvas)', borderRadius: '28px', fontSize: '15px' }}>
+                    No scheme requests yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                    {/* Top requested */}
+                    {suggestionsData.topRequests?.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-mid-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Most Requested</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {suggestionsData.topRequests.map((r, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'var(--color-canvas)', borderRadius: '12px' }}>
+                              <span style={{ fontSize: '14px', color: 'var(--color-primary-ink)', fontWeight: '500' }}>{r.suggestion}</span>
+                              <span className="badge-status badge-confirmed" style={{ fontSize: '12px', padding: '4px 12px', flexShrink: 0 }}>{r.count}×</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By district */}
+                    {suggestionsData.byDistrict?.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-mid-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Requests by District</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {suggestionsData.byDistrict.map((d, i) => (
+                            <span key={i} style={{ padding: '6px 14px', background: 'var(--color-canvas)', borderRadius: '980px', fontSize: '13px', color: 'var(--color-primary-ink)', fontWeight: '500' }}>
+                              {d.district} <span style={{ color: 'var(--color-mid-gray)', fontWeight: '400' }}>({d.count})</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent raw list */}
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-mid-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Recent Submissions</div>
+                      <div style={{ width: '100%', overflowX: 'auto' }}>
+                        <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ padding: '12px 16px' }}>Request</th>
+                              <th style={{ padding: '12px 16px' }}>Member</th>
+                              <th style={{ padding: '12px 16px' }}>District / Assembly</th>
+                              <th style={{ padding: '12px 16px' }}>Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {suggestionsData.recent.map((s, i) => (
+                              <tr key={i}>
+                                <td style={{ padding: '14px 16px', fontWeight: '500', color: 'var(--color-primary-ink)', fontSize: '14px' }}>{s.suggestion}</td>
+                                <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--color-mid-gray)' }}>{s.voterName || '—'}</td>
+                                <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--color-mid-gray)' }}>
+                                  {s.district ? <><div style={{ fontWeight: '500', color: 'var(--color-primary-ink)' }}>{s.district}</div><div style={{ fontSize: '12px' }}>{s.assemblyName || ''}</div></> : '—'}
+                                </td>
+                                <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--color-mid-gray)', fontVariantNumeric: 'tabular-nums' }}>
+                                  {new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         ) : (
