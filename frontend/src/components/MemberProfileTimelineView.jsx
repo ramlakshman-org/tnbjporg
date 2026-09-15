@@ -421,7 +421,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
                           <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'var(--font-ui-monospace)' }}>{maskPII ? maskEpicDisplay(ref.epicNo) : ref.epicNo}</div>
                         </div>
                         <span className="tag-pill tag-sunlit" style={{ fontSize: '10px', fontWeight: '700', flexShrink: 0 }}>
-                          {ref.applications?.length || 0} Scheme(s)
+                          {ref.applicationCount || 0} Scheme(s)
                         </span>
                       </div>
 

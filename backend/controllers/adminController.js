@@ -629,6 +629,17 @@ const getMemberReferrals = async (req, res) => {
       l2Raw.forEach(r => { if (r._id) l2CountMap[r._id] = r.count; });
     }
 
+    // Fetch scheme application counts per referred user — ONE bulk aggregation
+    const userIds = referredUsers.map(u => u._id);
+    const appCountMap = {};
+    if (userIds.length > 0) {
+      const appRaw = await SchemeApplication.aggregate([
+        { $match: { userId: { $in: userIds } } },
+        { $group: { _id: '$userId', count: { $sum: 1 } } }
+      ]);
+      appRaw.forEach(r => { if (r._id) appCountMap[String(r._id)] = r.count; });
+    }
+
     const referredVoters = referredUsers.map(u => ({
       id: u._id,
       epicNo: u.epicNo,
@@ -638,7 +649,8 @@ const getMemberReferrals = async (req, res) => {
       assemblyName: u.assemblyName,
       boothNo: u.boothNo,
       referralCode: u.referralCode,
-      level2Count: l2CountMap[u.referralCode] || 0
+      level2Count: l2CountMap[u.referralCode] || 0,
+      applicationCount: appCountMap[String(u._id)] || 0
     }));
 
     return res.status(200).json({
