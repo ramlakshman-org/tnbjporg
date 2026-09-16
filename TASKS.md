@@ -436,6 +436,44 @@ Minimal, zero-new-query implementation: piggybacked on the existing User bulk lo
 
 ---
 
+## BUG FIX 10 — localStorage SecurityError in WhatsApp WebView
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~20 min
+**Priority:** CRITICAL — app crashed on load for all users opening referral links from WhatsApp
+
+### Problem
+Sentry (`bjptn-frontend` project) caught a `SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.` error originating inside React `useState` initializers, at the referral URL `https://www.tnbjp.org/r/NT-YOV4KJN9`. Reported 32+ times as of Sep 15, 2026 (10:16 UTC first occurrence).
+
+**Root cause:** When users tap a shared referral link inside WhatsApp (or any in-app browser), WhatsApp opens it in a restricted WebView that blocks `localStorage` access. `AuthContext.jsx` was calling `localStorage.getItem()` directly inside multiple `useState(() => ...)` initializers with no try/catch. These run synchronously during React's initial render — the SecurityError propagated up, crashed the entire React tree, and the user saw a blank white screen. Campaign's primary sharing channel (WhatsApp referral links) was delivering a broken app.
+
+`utils/api.js` request interceptor also had two unprotected `localStorage.getItem()` calls that would crash any API call in the same restricted environments.
+
+### Fix
+Added a `safeLS` helper object in `AuthContext.jsx` that wraps every localStorage operation in try/catch:
+```javascript
+const safeLS = {
+  get: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
+  set: (key, val) => { try { localStorage.setItem(key, val); } catch {} },
+  remove: (key) => { try { localStorage.removeItem(key); } catch {} },
+};
+```
+Replaced all `localStorage.*` calls in `AuthContext.jsx` (20+ occurrences across `isExpired()`, five `useState` initializers, `loginUser`, `logoutUser`, `loginAdmin`, `logoutAdmin`, inactivity tracker, and the referral capture `useEffect`) with `safeLS.*`.
+
+Also protected the two reads in `utils/api.js` interceptor with individual try/catch blocks.
+
+**Behaviour after fix:** In restricted WebViews, localStorage reads return `null` (user appears logged out — safe fallback). Writes are silently skipped. The app loads and renders normally. Users can register via the referral link without a blank screen.
+
+### Files changed
+- `frontend/src/context/AuthContext.jsx` — `safeLS` helper + all localStorage calls replaced
+- `frontend/src/utils/api.js` — request interceptor localStorage reads protected
+
+### Commit
+- `f7844c5`
+
+---
+
 ## TASK 7 — OTP Rate Limiting (Spam & SMS Credit Protection)
 
 **Status:** ✅ COMPLETED — Sep 16, 2026  
