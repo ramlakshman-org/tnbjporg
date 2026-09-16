@@ -354,6 +354,88 @@ Middleware strips the `$gt` operator; controller receives sanitized input.
 
 ---
 
+## TASK 8 — Tamil Translation Gaps (ChatbotPage)
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~1 hour
+**Priority:** HIGH — all error messages were showing in English even in Tamil mode
+
+### Problem
+Two bugs caused error messages to appear in English regardless of language setting:
+
+1. **Wrong wrap order:** `err?.message || t('fallback')` — when backend returns an error, `err.message` is truthy so `t()` is never called. Fix: `t(err?.message || 'fallback')`.
+2. **Key mismatch:** Translation key `"Invalid OTP. Please try again."` didn't match the backend string `"Invalid OTP entered. Please try again."`.
+
+### Fixes applied
+
+**`frontend/src/pages/ChatbotPage.jsx` — 9 locations patched:**
+- `sendOtp` catch block
+- EPIC search catch block
+- Registration catch block
+- Referral link unavailable + load error
+- Profile load error
+- Referred members load error
+- Both submit-application handlers (2 functions × 2 catch points)
+
+**`frontend/src/i18n/translations.js` — 11 new Tamil translation keys added:**
+- OTP 60s cooldown message
+- OTP rate-limit message
+- 10-digit phone validation
+- Voter DB query failure
+- Mobile/EPIC required
+- Verification required
+- Failed to register schemes
+- Failed to submit application
+- Referral link unavailable (ℹ️ variant)
+- Unable to load referral link (❌ variant)
+- (Plus 3 OTP error keys from the earlier partial fix)
+
+### Files changed
+- `frontend/src/pages/ChatbotPage.jsx`
+- `frontend/src/i18n/translations.js`
+
+### Commits
+- `d99240a` — first OTP error fix (deployed earlier)
+- `4c999ed` — full audit fix covering all 9 locations + 11 new keys
+
+---
+
+## TASK 9 — Referral-wise Breakdown in Reports
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~1 hour
+**Priority:** MEDIUM — campaign tracking visibility
+
+### What was built
+Minimal, zero-new-query implementation: piggybacked on the existing User bulk lookup that already fires on every Reports page load.
+
+**In-app Reports table** — new "REFERRED BY" column (11th column):
+- Shows `NT-XXXXXXXX` referral code for members brought in via referral
+- Shows `—` for direct registrations
+- No new API endpoint, no new DB queries
+
+**Excel export** — new "Referred By" column L (12th column):
+- One additional `User.find()` per export (deduped mobiles, not N+1)
+- Title and filter header rows updated to span all 12 columns
+
+### Data verification before building
+- 148 total users in DB
+- 118/148 (80%) have `referredBy` set
+- 118/118 values are `NT-` format codes — zero mobiles, zero EPICs (no PII risk)
+- Confirmed from PM2 logs: `[registerSchemes] referredBy=NT-PCGBEHN2` in live registrations
+
+### Files changed
+- `backend/controllers/adminController.js` — `referredBy` added to both User bulk lookups in `getApplicationsList`; new User lookup + column L in `exportApplicationsExcel`
+- `frontend/src/components/ReportsView.jsx` — `referredBy` added to flatMap, table header, table cell
+
+### Commits
+- `878d072` — in-app table column
+- `e411b37` — Excel export column
+
+---
+
 ## TASK 7 — OTP Rate Limiting (Spam & SMS Credit Protection)
 
 **Status:** ✅ COMPLETED — Sep 16, 2026  
