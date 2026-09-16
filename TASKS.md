@@ -331,6 +331,29 @@ Attacker must know exact mobile, guess correctly within **5 tries**, within **5 
 
 ---
 
+## SECURITY FIX 4 — NoSQL Injection (express-mongo-sanitize)
+
+**Status:** ✅ COMPLETED — Sep 16, 2026
+**Who:** Developer (Claude + Ram)
+**Effort:** ~10 min
+**Priority:** LOW — vulnerability was accidentally blocked; this makes protection intentional
+
+### Problem
+NoSQL injection (e.g. `{ "$gt": "" }`) was accidentally blocked because `.trim()` throws a TypeError on objects before any MongoDB query ran. Accidental, not architectural. Any endpoint added in future without `.trim()` would be unprotected.
+
+### Fix
+Added `express-mongo-sanitize` middleware to `server.js`. Strips `$` and `.` from all request body fields at middleware level, before any controller runs. Protection is now architectural — no longer depends on individual controllers calling `.trim()`.
+
+### Files changed
+- `backend/package.json` — added `express-mongo-sanitize` dependency
+- `backend/server.js` — `require('express-mongo-sanitize')` + `app.use(mongoSanitize())` after `express.json()`
+
+### Test result
+`POST /api/check-mobile` with `{"mobile":{"$gt":""}}` → `BLOCKED` ✅
+Middleware strips the `$gt` operator; controller receives sanitized input.
+
+---
+
 ## TASK 7 — OTP Rate Limiting (Spam & SMS Credit Protection)
 
 **Status:** ✅ COMPLETED — Sep 16, 2026  

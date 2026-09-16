@@ -12,6 +12,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -82,6 +83,9 @@ app.use(express.json({
     }
   },
 }));
+
+// Strip $ and . from all request body fields — prevents NoSQL injection reaching MongoDB.
+app.use(mongoSanitize());
 
 // Behind nginx: trust the first proxy hop so rate-limit / logging see the real
 // client IP from X-Forwarded-For.
