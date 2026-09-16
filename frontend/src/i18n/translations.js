@@ -1,4 +1,6 @@
 export const ta = {
+  "+{count} more applied schemes": "+{count} பிற விண்ணப்பித்த திட்டங்கள்",
+  "View your complete list in My Schemes": "முழுப் பட்டியலையும் எனது திட்டங்களில் பார்க்கவும்",
   "World's Largest. India's Biggest. Soon to be Tamil Nadu's No. 1.": "உலகின் மிகப் பெரிய அமைப்பு. இந்தியாவின் மிகப் பெரிய கட்சி. விரைவில் தமிழ்நாட்டின் No.1.",
   "You are joining the world's leading political organization. Click below to register for Central Government welfare schemes.": "நீங்கள் உலகின் முன்னணி அரசியல் அமைப்பில் இணைகிறீர்கள். மத்திய அரசு நலத்திட்டங்களுக்கு பதிவு செய்ய கீழே கிளிக் செய்யவும்.",
   "Start": "தொடங்கு",

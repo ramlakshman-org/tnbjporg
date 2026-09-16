@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import QRCode from 'qrcode'
 import html2canvas from 'html2canvas'
+import WelfareCardSchemes from '../components/WelfareCardSchemes'
 import { useNavigate } from 'react-router-dom'
 import { chat } from '../api'
 import '../styles/chatbot.css'
@@ -3060,7 +3061,7 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
 }
 
 // ── Scheme Welfare Card ──────────────────────────────────────────────
-function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
+export function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
   const { t, getSchemeData } = useLang()
   const NT_SCHEMES = useMergedSchemes(NT_SCHEMES_STATIC, adaptToNtShape)
   const [schemes, setSchemes] = useState([])
@@ -3202,7 +3203,7 @@ function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
                     <path fill="#f76201" d="m19.4 88.3c-1.1-1.8-0.9-3.4-0.3-5.1 1.4-3.7 4.2-6.2 7.3-8.3 0.4-0.2 0.7-0.5 0.9-0.6-2.1-1.5-4.5-2.8-6.5-4.6-5.1-4.6-7.9-10.6-9.8-17-1.8-5.9-2.4-12.1-2.4-18.2 0-7.7-1.7-15.1-5.3-21.9-1.1-2-2.4-3.9-3.7-5.9 1.4-1.3 3.2-1.5 5-1.5 5.7-0.1 10.9 1.6 15.8 4.4 5.1 3 9.2 7 12.6 11.7 0.2 0.3 0.5 0.6 0.8 1 2.3-7.3-1.5-12.6-5.3-18 2-1.2 4.1-0.9 6.1-0.6 7.6 1.1 13.7 5 18.7 10.6 1.9 2.1 3.4 4.5 5 6.8 0.3 0.3 0.5 0.7 0.5 0.8 4.3-7.2 8.5-14.4 13-22 4.8 6.1 7.8 12.6 10.8 18.9 2.4-2.7 4.8-5.5 7.4-8 3.8-3.6 8.2-6.3 13.2-7.7 2.7-0.7 4.2-0.7 7 0.3-3.4 6.1-4.8 12.5-3.1 19.3 1.4-1.9 2.7-4 4.3-5.8 5.3-6.2 11.7-10.4 19.9-11.7 2.4-0.4 4.9-0.6 7.2 0.1 0.7 0.2 1.4 0.6 2.3 1-0.4 0.5-0.7 0.8-1 1.1-4.4 5-7.3 10.6-7.5 17.4-0.1 3.8 0.2 7.6 0.5 11.4 0.6 8-0.1 15.7-3.5 23.1-2.4 5.3-5.8 9.9-10.1 13.9-0.1 0.1-0.3 0.3-0.4 0.4-0.1 0.1-0.1 0.1-0.1 0.2 4.2 3.8 8 7.7 6 14.3-0.8-0.5-1.4-0.9-2-1.3-1.6-1.1-3.3-1.3-5.1-0.7-2.9 0.8-5.3 2.5-7.5 4.4-3 2.7-6.4 4.5-10.4 5.2-3.8 0.7-7.6 0.5-11.3-1-0.4-0.2-0.9-0.2-1.3-0.1-6.3 1.4-10.8 7-10.7 13 0.1 6.8-0.3 13.6-2.1 20.2-0.7 2.4-1.7 4.6-2.6 6.9q2.7-0.3 5.7-0.6c0.6-0.1 1.2-0.2 1.8 0 1 0.2 1.3 1 1.1 2-0.2 1.1-1.1 2-1.9 2-2.7-0.1-5.4-0.2-8.1-0.1-1.7 0-1.9-1.4-2.6-2.3-0.7-0.8 0-1.3 0.4-1.9 2-2.9 2.9-6.2 3.3-9.7 0.6-4.9 0.9-9.8 1.2-14.7 0.1-1.5-0.4-2-2.1-2.3 0 0.5-0.1 1-0.1 1.5 0 5.4 0 10.7-1.1 16-0.9 4.1-2.2 7.9-5.3 10.9-3.2 3.1-7.2 4.1-11.5 4-2.1-0.1-4.3-0.3-6.4-0.8-2.1-0.5-2.4-2.2-0.8-3.7 1.6-1.6 3.6-1.9 5.8-1.8 2.9 0.2 5.9 0.5 8.8 0.8 1 0.1 1.5-0.3 2-1.1 3.2-4.7 4.7-10 5.2-15.6 0.3-4.4 0.1-8.8-1.6-13-1.2-2.9-3-5.2-5.8-6.8-1.9-1.1-3.7-2.3-5.6-3.4-0.3-0.2-0.8-0.3-1-0.2-4 1.9-8 1.4-12 0.3-2.8-0.8-5.2-2.2-7.5-3.9-2.5-1.8-5.2-3.2-8.2-3.7-2.1-0.1 4.0 0.4-6 1.7zm37.5 47.4c-1.1 0.1-2.2 0.3-3.2 0.4-1.5 0.1-2.7-0.5-4.2 0-0.2 0.1-0.9 0.3-0.9 0.6 0 0.2 0.2 0.4 0.8 0.6 1.3 0.4 2.2 0.1 5.4 0 1.1 0 1.8-0.5 2.1-1.6z" />
                   </svg>
                 </div>
-                <div style={{ fontSize: 9, fontWeight: 800, color: '#f76201', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, color: '#f76201', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, flexShrink: 0 }}>
                   {t('Applied Schemes')} / விண்ணப்பித்த திட்டங்கள்
                 </div>
                 {schemes.length === 0 ? (
@@ -3214,14 +3215,10 @@ function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {schemes.map((app, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                        <span style={{ color: '#f76201', fontSize: 10, flexShrink: 0, marginTop: 2 }}>✦</span>
-                        <span style={{ fontSize: 11.5, color: '#0f172a', lineHeight: 1.4, fontWeight: 500 }}>{resolveSchemeDisplay(app)}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <WelfareCardSchemes
+                    titles={schemes.map(resolveSchemeDisplay)}
+                    moreLabel={(count) => t('+{count} more applied schemes', { count })}
+                  />
                 )}
               </div>
 
@@ -3256,6 +3253,9 @@ function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
             {/* Action buttons — full width below card */}
             {schemes.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 340 }}>
+                <button onClick={onApplySchemes} style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                  {t('View your complete list in My Schemes')}
+                </button>
                 <button onClick={handleWhatsAppShare} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: '#25d366', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                   <i className="bi bi-whatsapp" /> {t('Share on WhatsApp')}
                 </button>
