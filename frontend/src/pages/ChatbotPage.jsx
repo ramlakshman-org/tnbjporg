@@ -2567,7 +2567,7 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
         setProfileData(data)
       })
       .catch((err) => {
-        setError(err.message || t('Unable to load profile.'))
+        setError(t(err.message || 'Unable to load profile.'))
       })
       .finally(() => {
         setLoading(false)
@@ -2955,7 +2955,7 @@ function MyReferralsListPanel({ bjpCode, onBack }) {
           totalImpact: data.totalImpact ?? list.length
         })
       })
-      .catch((err) => setError(err.message || t('Unable to load referred members.')))
+      .catch((err) => setError(t(err.message || 'Unable to load referred members.')))
       .finally(() => setLoading(false))
   }, [bjpCode])
 
@@ -3354,10 +3354,10 @@ function BoothPresidentPanel({ card, profile, onBack }) {
         setHasApplied(true)
         setMode('status')
       } else {
-        setError(res.message || t('Failed to submit application'))
+        setError(t(res.message || 'Failed to submit application'))
       }
     } catch (err) {
-      setError(err.message || t('Failed to submit application'))
+      setError(t(err.message || 'Failed to submit application'))
     } finally {
       setSubmitting(false)
     }
@@ -3387,10 +3387,10 @@ function BoothPresidentPanel({ card, profile, onBack }) {
         setHasApplied(true)
         setMode('status')
       } else {
-        setError(res.message || t('Failed to submit application'))
+        setError(t(res.message || 'Failed to submit application'))
       }
     } catch (err) {
-      setError(err.message || t('Failed to submit application'))
+      setError(t(err.message || 'Failed to submit application'))
     } finally {
       setSubmitting(false)
     }
@@ -4295,7 +4295,7 @@ export default function ChatbotPage() {
       }
     } catch (err) {
       setIsTyping(false)
-      await botSay(`❌ ${err?.message || t('Failed to send OTP. Please try again.')}`, 300)
+      await botSay(`❌ ${t(err?.message || 'Failed to send OTP. Please try again.')}`, 300)
     }
   }
 
@@ -4463,7 +4463,7 @@ export default function ChatbotPage() {
         setChatState(S.DONE)
         return
       }
-      await botSay(`❌ ${err.message || t('EPIC not found in Voter DB. Please check and try again.')}`, 200)
+      await botSay(`❌ ${t(err.message || 'EPIC not found in Voter DB. Please check and try again.')}`, 200)
       await botSay(t('Find your EPIC number: https://electoralsearch.eci.gov.in/'), 400)
     }
   }
@@ -4526,7 +4526,7 @@ export default function ChatbotPage() {
       setActiveView('my_card')
     } catch (err) {
       setIsTyping(false)
-      await botSay(`❌ ${err.message || t('Registration failed. Please try again.')}`, 200)
+      await botSay(`❌ ${t(err.message || 'Registration failed. Please try again.')}`, 200)
       setChatState(S.SELECT_SCHEMES)
     }
   }
@@ -4569,7 +4569,7 @@ export default function ChatbotPage() {
 
 
       case 'referral': {
-        if (!bjpCode) { await botSay('ℹ️ Referral link unavailable.', 200); return }
+        if (!bjpCode) { await botSay(t('ℹ️ Referral link unavailable.'), 200); return }
         // Use cached link from card if available — avoids a session-auth round-trip
         const cachedLink = cardRef.current?.referral_link
         if (cachedLink) {
@@ -4586,7 +4586,7 @@ export default function ChatbotPage() {
           setActiveView('referral')
         } catch {
           setIsTyping(false)
-          await botSay('❌ Unable to load referral link.', 200)
+          await botSay(t('❌ Unable to load referral link.'), 200)
         }
         break
       }
