@@ -1384,10 +1384,11 @@ const exportApplicationsExcel = async (req, res) => {
       { header: 'Scheme Name',  key: 'scheme',   width: 32 },
       { header: 'Cluster',      key: 'cluster',  width: 45 },
       { header: 'Status',       key: 'status',   width: 13 },
-      { header: 'Applied Date', key: 'date',     width: 14 },
+      { header: 'Applied Date', key: 'date',       width: 14 },
+      { header: 'Referred By',  key: 'referredBy', width: 16 },
     ];
     sheet.columns = COLUMNS.map(c => ({ key: c.key, width: c.width }));
-    const LAST_COL = 'K'; // 11 columns → A..K
+    const LAST_COL = 'L'; // 12 columns → A..L
 
     // ── Scope label (based on the admin's role) ──
     let scopeLabel;
@@ -1456,6 +1457,15 @@ const exportApplicationsExcel = async (req, res) => {
       .select('voterName epicNo mobile district assemblyName boothNo schemeName clusterName status appliedAt')
       .lean();
 
+    // Build mobile → referredBy map for the Referred By column
+    const excelRefByMap = {};
+    const excelMobiles = [...new Set(allDocs.map(d => d.mobile).filter(Boolean))];
+    if (excelMobiles.length > 0) {
+      const excelUserDocs = await User.find({ mobile: { $in: excelMobiles } })
+        .select('mobile referredBy').lean();
+      excelUserDocs.forEach(u => { if (u.mobile) excelRefByMap[u.mobile] = u.referredBy || ''; });
+    }
+
     // ── Sheet 1: one row per application ──
     let idx = 0;
     for (const doc of allDocs) {
@@ -1464,17 +1474,18 @@ const exportApplicationsExcel = async (req, res) => {
       const statusColors = STATUS_COLORS[doc.status] || { bg: 'FFe5e7eb', fg: 'FF374151' };
 
       const row = sheet.addRow({
-        sno:      idx,
-        name:     doc.voterName  || '—',
-        epic:     doc.epicNo     || '—',
-        mobile:   doc.mobile     || '—',
-        district: doc.district   || '—',
-        assembly: doc.assemblyName || '—',
-        booth:    doc.boothNo    || '—',
-        scheme:   resolveSchemeName(doc.schemeName, doc.schemeId),
-        cluster:  doc.clusterName || '—',
-        status:   doc.status     || '—',
-        date:     appliedDate,
+        sno:        idx,
+        name:       doc.voterName  || '—',
+        epic:       doc.epicNo     || '—',
+        mobile:     doc.mobile     || '—',
+        district:   doc.district   || '—',
+        assembly:   doc.assemblyName || '—',
+        booth:      doc.boothNo    || '—',
+        scheme:     resolveSchemeName(doc.schemeName, doc.schemeId),
+        cluster:    doc.clusterName || '—',
+        status:     doc.status     || '—',
+        date:       appliedDate,
+        referredBy: (doc.mobile && excelRefByMap[doc.mobile]) || '—',
       });
 
       // Alternate row banding
