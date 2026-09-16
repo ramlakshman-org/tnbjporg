@@ -206,7 +206,8 @@ const ReportsView = ({
         schemeName: 'No Scheme Applied',
         clusterName: '—',
         status: 'Unregistered',
-        appliedAt: '—'
+        appliedAt: '—',
+        referredBy: v.referredBy || '—'
       }];
     }
     return v.applications.map(app => ({
@@ -219,7 +220,8 @@ const ReportsView = ({
       schemeName: resolveSchemeName(app.schemeName || app.schemeId),
       clusterName: app.clusterName || 'BJP Welfare',
       status: app.status || 'Submitted',
-      appliedAt: app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : '—'
+      appliedAt: app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : '—',
+      referredBy: v.referredBy || '—'
     }));
   });
 
@@ -551,6 +553,7 @@ const ReportsView = ({
                   <th style={{ padding: '10px 12px' }}>BJP SCHEME NAME</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center' }}>STATUS</th>
                   <th style={{ padding: '10px 12px' }}>APPLIED DATE</th>
+                  <th style={{ padding: '10px 12px' }}>REFERRED BY</th>
                 </tr>
               </thead>
               <tbody>
@@ -568,6 +571,7 @@ const ReportsView = ({
                       <StatusBadge status={row.status} />
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--color-slate)', fontSize: '12px' }}>{row.appliedAt}</td>
+                    <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--color-slate)' }}>{row.referredBy}</td>
                   </tr>
                 ))}
               </tbody>

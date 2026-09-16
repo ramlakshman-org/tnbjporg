@@ -884,16 +884,23 @@ const getApplicationsList = async (req, res) => {
         }
       }
 
-      // referralCode lives on User, not SchemeApplication — patch it in bulk.
+      // referralCode and referredBy live on User, not SchemeApplication — patch in bulk.
       const fastMobiles = voters.map(v => v.mobile).filter(m => m && m !== 'N/A');
       if (fastMobiles.length > 0) {
         const fastUserDocs = await User.find({ mobile: { $in: fastMobiles } })
-          .select('mobile referralCode').lean();
+          .select('mobile referralCode referredBy').lean();
         const fastRefMap = {};
-        fastUserDocs.forEach(u => { if (u.mobile) fastRefMap[u.mobile] = u.referralCode || ''; });
+        const fastRefByMap = {};
+        fastUserDocs.forEach(u => {
+          if (u.mobile) {
+            fastRefMap[u.mobile]   = u.referralCode || '';
+            fastRefByMap[u.mobile] = u.referredBy   || '';
+          }
+        });
         voters = voters.map(v => ({
           ...v,
-          referralCode: fastRefMap[v.mobile] || v.referralCode || ''
+          referralCode: fastRefMap[v.mobile]   || v.referralCode || '',
+          referredBy:   fastRefByMap[v.mobile] || ''
         }));
       }
 
@@ -971,13 +978,19 @@ const getApplicationsList = async (req, res) => {
       }
     });
 
-    // referralCode lives on User, not SchemeApplication — fetch it in bulk.
+    // referralCode and referredBy live on User, not SchemeApplication — fetch in bulk.
     const mobileList = paginatedApplicants.map(a => a.mobile).filter(Boolean);
-    const userRefMap = {};
+    const userRefMap   = {};
+    const userRefByMap = {};
     if (mobileList.length > 0) {
       const userDocs = await User.find({ mobile: { $in: mobileList } })
-        .select('mobile referralCode').lean();
-      userDocs.forEach(u => { if (u.mobile) userRefMap[u.mobile] = u.referralCode || ''; });
+        .select('mobile referralCode referredBy').lean();
+      userDocs.forEach(u => {
+        if (u.mobile) {
+          userRefMap[u.mobile]   = u.referralCode || '';
+          userRefByMap[u.mobile] = u.referredBy   || '';
+        }
+      });
     }
 
     const voters = paginatedApplicants.map(u => {
@@ -1002,7 +1015,8 @@ const getApplicationsList = async (req, res) => {
         district: u.district,
         assemblyName: u.assemblyName,
         boothNo: u.boothNo,
-        referralCode: userRefMap[u.mobile] || u.referralCode || '',
+        referralCode: userRefMap[u.mobile]   || u.referralCode || '',
+        referredBy:   userRefByMap[u.mobile] || '',
         applications: apps
       };
     });
