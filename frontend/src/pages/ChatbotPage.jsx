@@ -4351,7 +4351,7 @@ export default function ChatbotPage() {
     } catch (err) {
       setIsTyping(false)
       // 400 = invalid/expired OTP, 429 = too many attempts
-      await botSay(`❌ ${err?.message || t('Invalid OTP. Please try again.')}`, 300)
+      await botSay(`❌ ${t(err?.message || 'Invalid OTP. Please try again.')}`, 300)
       // stay on AWAIT_OTP so the user can retry
     }
   }
