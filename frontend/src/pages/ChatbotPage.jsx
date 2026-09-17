@@ -279,8 +279,8 @@ function WelcomeBannerMsg({ onStart }) {
         onError={(e) => { e.target.style.display = 'none' }} 
       />
       <div className="banner-content">
-        <h2>{t("World's Largest. India's Biggest. Soon to be Tamil Nadu's No. 1.")}</h2>
-        <p>{t("You are joining the world's leading political organization. Click below to register for Central Government welfare schemes.")}</p>
+        <h2>{t("BJP Tamilnadu")}</h2>
+        <p>{t("Initiative to register one lakh new beneficiaries in 25 Schemes")}</p>
         <button className="btn-start" onClick={onStart}>
           <i className="bi bi-play-circle-fill" /> {t('Start')}
         </button>
