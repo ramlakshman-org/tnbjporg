@@ -762,7 +762,7 @@ const DistrictAdminDashboard = () => {
                                   const digits = String(voter.mobile || '').replace(/\D/g, '');
                                   const phone = digits.length === 10 ? `91${digits}` : digits;
                                   const name = (voter.voterName || '').replace(/\s*-\s*$/, '').trim();
-                                  const msg = encodeURIComponent(`Hi ${name}, regarding your BJP Nalam Thittam welfare scheme registration — please call us or reply here for any help.`);
+                                  const msg = encodeURIComponent(`Hi ${name}, regarding your Central Government welfare scheme registration — please call us or reply here for any help.`);
                                   window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
                                 }}
                                 className="btn btn-ghost"

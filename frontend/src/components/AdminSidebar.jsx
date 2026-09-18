@@ -188,7 +188,7 @@ const AdminSidebar = ({
                   textOverflow: 'ellipsis'
                 }}
               >
-                BJP Nalam Thittam
+                Central Government Schemes
               </div>
               <div
                 className="admin-tagline"

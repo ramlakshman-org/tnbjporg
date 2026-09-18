@@ -382,7 +382,7 @@ function FullReferralPanel({ link, onBack }) {
   const handleShareWhatsApp = () => {
     if (!link || !canvasRef.current) return
     // WhatsApp bold markdown: *text*
-    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for BJP Nalam Thittam welfare schemes — register here:*')}\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for Central Government welfare schemes — register here:*')}\n${link}`
     // Try Web Share API (mobile) — sends QR image + text as a single share
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
@@ -2152,7 +2152,7 @@ function ReferralLinkMsg({ link }) {
 
   const handleShareWhatsApp = () => {
     if (!link) return
-    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for BJP Nalam Thittam welfare schemes — register here:*')}\n${link}`
+    const shareText = `${t('*🪷 Join BJP Tamil Nadu!*')}\n\n${t('*Apply for Central Government welfare schemes — register here:*')}\n${link}`
     if (navigator.canShare && canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
         const file = new File([blob], 'bjp-referral-qr.png', { type: 'image/png' })
@@ -3124,7 +3124,7 @@ export function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
     const schemeList = schemes.map(s => `• ${resolveSchemeDisplay(s)}`).join('\n')
     const locationLine = [district, assemblyName].filter(Boolean).join(' · ')
     const shareText = [
-      `🪷 *BJP Nalam Thittam — Welfare Card*`,
+      `🪷 *Central Government Schemes — Welfare Card*`,
       ``,
       `*${name}*`,
       locationLine,
@@ -3189,7 +3189,7 @@ export function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
                   <img src="/bjp_logo.svg" alt="BJP" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display = 'none' }} />
                 </div>
                 <div style={{ textAlign: 'center', flex: 1, padding: '0 6px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', color: '#f76201', textTransform: 'uppercase', lineHeight: 1.2 }}>BJP Nalam Thittam</div>
+                  <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', color: '#f76201', textTransform: 'uppercase', lineHeight: 1.2 }}>Central Government Schemes</div>
                   <div style={{ fontSize: 8.5, fontWeight: 700, color: '#475569', marginTop: 1 }}>நலம் திட்டம் — Welfare Card</div>
                 </div>
                 <div style={{ width: 32 }} />
@@ -4073,7 +4073,7 @@ export default function ChatbotPage() {
           playNotificationSound()
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
-              new Notification('BJP Nalam Thittam', {
+              new Notification('Central Government Schemes', {
                 body: t('Your scheme application status has been updated.'),
                 icon: '/bjp_logo.png'
               })
@@ -4248,7 +4248,7 @@ export default function ChatbotPage() {
         const wbName = cache.card.voter_name ? cache.card.voter_name.split(' ')[0] : ''
         const wbText = wbName
           ? `👋 Welcome back, *${wbName}!* Your registration is active. Open *My Schemes* to view or add schemes.`
-          : `👋 Welcome back to *Nalam Thittam!* Open *My Schemes* to view or add schemes.`
+          : `👋 Welcome back to *Central Government Schemes!* Open *My Schemes* to view or add schemes.`
         addMsg('bot', 'text', { text: wbText, i18nKey: false })
       }
       setTimeout(() => {
@@ -4809,7 +4809,7 @@ export default function ChatbotPage() {
             <div className="left-menu-profile">
               <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.style.display = 'none' }} />
               <div className="left-menu-profile-info">
-                <div className="left-menu-brand">{t('BJP Nalam Thittam')}</div>
+                <div className="left-menu-brand">{t('Central Government Schemes')}</div>
                 <div className="left-menu-status">
                   <span className="status-dot-green" /> {t('Online')}
                 </div>
@@ -4942,7 +4942,7 @@ export default function ChatbotPage() {
                 <img src="/bjp_logo.svg" alt="BJP" onError={(e) => { e.target.style.display = 'none' }} />
               </div>
               <div className="chat-header-info">
-                <div className="chat-header-name">{t('BJP Nalam Thittam')}</div>
+                <div className="chat-header-name">{t('Central Government Schemes')}</div>
                 <div className="chat-header-status">
                   {isDone ? (
                     <><span className="status-dot-green" /> {t('Online')}</>

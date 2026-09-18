@@ -288,7 +288,7 @@ const ReportsView = ({
               Scheme Applications &amp; Member Reports
             </h1>
             <div style={{ fontSize: '13px', color: 'var(--color-slate)', marginTop: '4px' }}>
-              Generate, filter, and export customized Excel reports for BJP Nalam Thittam Welfare Schemes.
+              Generate, filter, and export customized Excel reports for Central Government Welfare Schemes.
             </div>
           </div>
 

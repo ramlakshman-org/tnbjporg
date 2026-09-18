@@ -208,7 +208,7 @@ const MemberProfileTimelineView = ({ voterData, onBack, onUpdateAppStatus, onSel
     return [
       {
         title: 'Application Submitted',
-        subtitle: `Directive submitted via BJP Nalam Thittam Portal`,
+        subtitle: `Directive submitted via Central Government Schemes Portal`,
         time: appliedTime,
         status: 'done',
         icon: CheckCircle2

@@ -55,7 +55,7 @@ const SchemeApplicationModal = ({ selectedSchemes, user, onClose, onConfirmSubmi
               Selected Welfare Schemes ({schemesList.length})
             </h2>
             <div style={{ fontSize: '13px', color: 'var(--color-slate)', marginTop: '2px' }}>
-              Review your selected BJP Nalam Thittam schemes before submitting
+              Review your selected Central Government schemes before submitting
             </div>
           </div>
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px', borderRadius: '9999px' }}>

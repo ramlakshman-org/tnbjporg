@@ -25,7 +25,7 @@ const Navbar = ({ activeTab, setActiveTab }) => {
           />
           <div>
             <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--color-midnight-ink)', letterSpacing: '-0.3px' }}>
-              BJP Nalam Thittam
+              Central Government Schemes
             </div>
             <div style={{ fontSize: '12px', color: 'var(--color-slate)' }}>
               Direct Benefit Transfer Automation
