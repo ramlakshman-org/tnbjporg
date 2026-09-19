@@ -6,7 +6,7 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, Share2, ChevronRight, FileText, Menu
+  Shield, Users, PhoneCall, RefreshCw, Search, Award, FileText, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
@@ -144,7 +144,7 @@ const BoothAdminDashboard = () => {
     }
   };
 
-  const fetchDashboardData = () => { fetchStats(); fetchVoters(1); };
+  const fetchDashboardData = () => { fetchStats(); fetchVoters(1); fetchBoothVoterRoll(1); };
 
   useEffect(() => { fetchStats(); }, []);
   useEffect(() => { fetchVoters(1); setCurrentPage(1); }, [searchQuery, statusFilter, schemeFilter]);
@@ -986,7 +986,7 @@ const BoothAdminDashboard = () => {
                               <div style={{ display: 'inline-flex', gap: '6px' }}>
                                 {voter.mobile && voter.mobile !== '—' && (
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${voter.mobile}`; }}
+                                    onClick={(e) => { e.stopPropagation(); handleDirectCallVoter({ voterName: voter.voterName, mobile: voter.mobile, applications: voter.applications || [] }); }}
                                     className="btn btn-ghost"
                                     style={{ padding: '5px 10px', fontSize: '12px' }}
                                   >

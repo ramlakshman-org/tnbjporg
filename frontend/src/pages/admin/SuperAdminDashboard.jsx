@@ -6,7 +6,7 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, PlusCircle, Search, LogIn, Eye, Award, Share2, ChevronRight, FileText, Menu
+  Shield, Users, Building, PhoneCall, RefreshCw, PlusCircle, Search, LogIn, Award, FileText, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
@@ -24,7 +24,7 @@ import TnDistrictMap from '../../components/TnDistrictMap';
 const LIMIT = 20;
 
 const SuperAdminDashboard = () => {
-  const { admin, logoutAdmin } = useAuth();
+  const { admin, logoutAdmin, loginAdmin } = useAuth();
   const BJP_SCHEMES = useBjpSchemes();
   const [subPage, setSubPage] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -103,6 +103,9 @@ const SuperAdminDashboard = () => {
   const navigateSubPage = (pageKey) => {
     setSubPage(pageKey);
     setSelectedVoterTimeline(null);
+    setDistStatsPage(1);
+    setAssStatsPage(1);
+    setBoothStatsPage(1);
     try { window.history.pushState({}, '', `/admin/superadmin/${pageKey}`); } catch (e) {}
   };
 
@@ -259,7 +262,7 @@ const SuperAdminDashboard = () => {
   }, [assemblyFilter, districtFilter]);
 
   useEffect(() => {
-    if (subPage === 'logins' && credSubTab === 'booths' && selectedAssemblyNo) {
+    if (subPage === 'logins' && credSubTab === 'booths' && selectedAssemblyNo && assembliesList.length > 0) {
       fetchBoothCredentials(selectedAssemblyNo);
     }
   }, [subPage, credSubTab, selectedAssemblyNo]);
@@ -1010,9 +1013,9 @@ const SuperAdminDashboard = () => {
                           <td style={{ padding: '12px 10px', color: 'var(--color-ash-gray)', fontSize: '12px', fontWeight: '600' }}>{rowNum}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ fontWeight: '700', color: 'var(--color-midnight-ink)' }}>{voter.voterName}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{voter.epicNo}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-slate)', fontFamily: 'monospace' }}>{maskEpic(voter.epicNo)}</div>
                           </td>
-                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{voter.mobile}</td>
+                          <td style={{ padding: '12px 10px', fontWeight: '600' }}>{maskMobile(voter.mobile)}</td>
                           <td style={{ padding: '12px 10px' }}>
                             <span className="tag-pill tag-sunlit" style={{ fontWeight: '700', fontSize: '11px', padding: '4px 10px' }}>
                               <Award size={12} /> {voter.applications.length} Scheme{voter.applications.length > 1 ? 's' : ''}

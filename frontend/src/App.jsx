@@ -13,7 +13,7 @@ const MainAppContent = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const isAdminRoute = currentPath.startsWith('/admin') || !!admin;
+  const isAdminRoute = currentPath.startsWith('/admin');
   const isReferralRoute = currentPath.startsWith('/r/');
 
   // 1. Render Admin Portal if URL starts with /admin or admin is logged in

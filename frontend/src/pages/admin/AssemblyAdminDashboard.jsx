@@ -61,6 +61,7 @@ const AssemblyAdminDashboard = () => {
   const navigateSubPage = (pageKey) => {
     setSubPage(pageKey);
     setSelectedVoterTimeline(null);
+    setBoothStatsPage(1);
     try { window.history.pushState({}, '', `/admin/assembly/${pageKey}`); } catch (e) {}
   };
 

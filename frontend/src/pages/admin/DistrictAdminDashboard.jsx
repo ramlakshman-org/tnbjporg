@@ -6,7 +6,7 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, Search, Eye, Award, Share2, Menu
+  Shield, Users, Building, PhoneCall, RefreshCw, Search, Award, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
@@ -59,6 +59,8 @@ const DistrictAdminDashboard = () => {
   const navigateSubPage = (pageKey) => {
     setSubPage(pageKey);
     setSelectedVoterTimeline(null);
+    setAssStatsPage(1);
+    setBoothStatsPage(1);
     try {
       window.history.pushState({}, '', `/admin/district/${pageKey}`);
     } catch (e) {}
