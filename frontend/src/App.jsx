@@ -16,7 +16,7 @@ const MainAppContent = () => {
   const isAdminRoute = currentPath.startsWith('/admin');
   const isReferralRoute = currentPath.startsWith('/r/');
 
-  // 1. Render Admin Portal if URL starts with /admin or admin is logged in
+  // 1. Render Admin Portal if URL starts with /admin
   if (isAdminRoute) {
     return (
       <ErrorBoundary>

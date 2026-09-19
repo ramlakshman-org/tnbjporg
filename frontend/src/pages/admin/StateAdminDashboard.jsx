@@ -6,7 +6,7 @@ import MemberProfileTimelineView, { formatSchemeName, formatAppliedDateTime, get
 import ReportsView from '../../components/ReportsView';
 import { useBjpSchemes, buildSchemeCards } from '../../utils/schemesData';
 import {
-  Shield, Users, Building, PhoneCall, RefreshCw, Search, Award, FileText, Menu
+  Shield, Users, PhoneCall, RefreshCw, Search, Award, FileText, Menu
 } from 'lucide-react';
 import TopReferrersCard from '../../components/TopReferrersCard';
 import SchemePieChart from '../../components/SchemePieChart';
