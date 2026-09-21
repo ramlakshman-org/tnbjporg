@@ -65,7 +65,7 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
         setCurrentPage(res.data.currentPage || 1);
       }
     } catch (err) {
-      console.error('Error fetching Booth President requests:', err);
+      console.error('Error fetching volunteer requests:', err);
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
         fetchRequests(currentPage);
       }
     } catch (err) {
-      console.error('Error updating Booth President request action:', err);
+      console.error('Error updating volunteer request:', err);
       alert(err.response?.data?.message || 'Failed to update request');
     } finally {
       setProcessingId(null);
@@ -119,12 +119,10 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--color-midnight-ink, #0f172a)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldCheck size={24} style={{ color: 'var(--color-saffron, #ff9933)' }} />
-            Booth President Applications
+            Volunteer Applications
           </h2>
           <div style={{ fontSize: '13px', color: 'var(--color-slate, #64748b)', marginTop: '4px' }}>
-            {isAssemblyAdmin ? `Manage Booth President applications for ${admin.assemblyName} Constituency` :
-             isDistrictAdmin ? `Manage Booth President applications for ${admin.district} District` :
-             'Review and manage Booth President applications across all electoral booths in Tamil Nadu'}
+            Review and approve volunteer applications from BJP members across Tamil Nadu
           </div>
         </div>
 
@@ -173,7 +171,7 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
           </div>
           <div>
             <div className="stat-number" style={{ fontSize: '22px', fontWeight: '800', color: '#16a34a' }}>{stats.approved}</div>
-            <div className="stat-label" style={{ fontSize: '12px', color: '#16a34a' }}>Approved Presidents</div>
+            <div className="stat-label" style={{ fontSize: '12px', color: '#16a34a' }}>Approved Volunteers</div>
           </div>
         </div>
 
@@ -288,12 +286,12 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
         {loading ? (
           <div style={{ padding: '60px', textAlgin: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', border: '3px solid #ff9933', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Loading Booth President applications...</div>
+            <div style={{ fontSize: '13px', color: '#64748b' }}>Loading volunteer applications...</div>
           </div>
         ) : requests.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
             <ShieldCheck size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
-            <div style={{ fontSize: '15px', fontWeight: '600' }}>No Booth President Requests Found</div>
+            <div style={{ fontSize: '15px', fontWeight: '600' }}>No Volunteer Applications Found</div>
             <div style={{ fontSize: '12px', marginTop: '4px' }}>There are no applications matching your current filter criteria.</div>
           </div>
         ) : (
@@ -302,8 +300,7 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   <th style={{ padding: '12px 16px' }}>Applicant</th>
-                  <th style={{ padding: '12px 16px' }}>Target Booth & Location</th>
-                  <th style={{ padding: '12px 16px' }}>Original Voter Booth</th>
+                  <th style={{ padding: '12px 16px' }}>District / Assembly</th>
                   <th style={{ padding: '12px 16px' }}>Applied Date</th>
                   <th style={{ padding: '12px 16px' }}>Status</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
@@ -321,21 +318,11 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
                       </div>
                     </td>
 
-                    {/* Target Location */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: '700', color: '#ea580c' }}>
-                        Booth {r.boothNo}
-                        {r.isCustomBooth && <span style={{ fontSize: '10px', background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '10px', marginLeft: '6px' }}>Custom Selection</span>}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                        {r.assemblyName} ({r.district})
-                      </div>
-                    </td>
-
-                    {/* Original Location */}
+                    {/* District / Assembly */}
                     <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px' }}>
-                      <div>Booth {r.originalBoothNo || '1'}</div>
-                      <div style={{ fontSize: '11px' }}>{r.originalAssembly || r.assemblyName}</div>
+                      {r.district && <div style={{ fontWeight: '600', color: '#334155' }}>{r.district}</div>}
+                      {r.assemblyName && <div style={{ fontSize: '11px', marginTop: '2px' }}>{r.assemblyName}</div>}
+                      {!r.district && !r.assemblyName && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
 
                     {/* Date */}
@@ -363,53 +350,32 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
                       )}
                     </td>
 
-                    {/* Actions */}
+                    {/* Actions — Super Admin only */}
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                        {r.status !== 'Approved' && (
-                          <button
-                            onClick={() => handleAction(r._id, 'Approved')}
-                            disabled={processingId === r._id}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: '#16a34a',
-                              color: '#fff',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <CheckCircle2 size={12} /> Approve
-                          </button>
-                        )}
-
-                        {r.status !== 'Rejected' && (
-                          <button
-                            onClick={() => { setRejectingItem(r); setRejectionReason(''); }}
-                            disabled={processingId === r._id}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              border: '1px solid #fecaca',
-                              background: '#fff',
-                              color: '#dc2626',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <XCircle size={12} /> Reject
-                          </button>
-                        )}
-                      </div>
+                      {admin.role === 'SUPER_ADMIN' ? (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          {r.status !== 'Approved' && (
+                            <button
+                              onClick={() => handleAction(r._id, 'Approved')}
+                              disabled={processingId === r._id}
+                              style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <CheckCircle2 size={12} /> Approve
+                            </button>
+                          )}
+                          {r.status !== 'Rejected' && (
+                            <button
+                              onClick={() => { setRejectingItem(r); setRejectionReason(''); }}
+                              disabled={processingId === r._id}
+                              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <XCircle size={12} /> Reject
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#cbd5e1' }}>View only</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -458,10 +424,10 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
         }}>
           <div style={{ background: '#fff', borderRadius: '12px', width: '420px', maxWidth: '100%', padding: '20px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', margin: '0 0 8px 0' }}>
-              Reject Booth President Application
+              Reject Volunteer Application
             </h3>
             <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
-              Decline application for <strong>{rejectingItem.voterName}</strong> (EPIC: {rejectingItem.epicNo}) for Booth {rejectingItem.boothNo} in {rejectingItem.assemblyName}.
+              Decline volunteer application for <strong>{rejectingItem.voterName}</strong> (EPIC: {rejectingItem.epicNo}){rejectingItem.assemblyName ? ` from ${rejectingItem.assemblyName}` : ''}.
             </div>
 
             <label style={{ fontSize: '12px', fontWeight: '600', color: '#334155', display: 'block', marginBottom: '4px' }}>

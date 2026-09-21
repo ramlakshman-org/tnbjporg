@@ -20,8 +20,9 @@ let voterClient = null;
 
 const getVoterDbClient = async () => {
   if (!voterClient) {
-    voterClient = new MongoClient(process.env.MONGO_VOTER_URL, { maxPoolSize: 30 });
-    await voterClient.connect();
+    const client = new MongoClient(process.env.MONGO_VOTER_URL, { maxPoolSize: 30 });
+    await client.connect();
+    voterClient = client;
     console.log('[Voter DB] Native MongoClient connected');
   }
   return voterClient.db(process.env.MONGO_VOTER_DB_NAME || 'voter_db');

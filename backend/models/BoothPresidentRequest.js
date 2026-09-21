@@ -6,6 +6,11 @@ const boothPresidentRequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  type: {
+    type: String,
+    enum: ['booth_president', 'volunteer'],
+    default: 'volunteer'
+  },
   voterName: {
     type: String,
     required: true,
@@ -28,12 +33,12 @@ const boothPresidentRequestSchema = new mongoose.Schema({
   },
   district: {
     type: String,
-    required: true,
+    default: '',
     trim: true
   },
   assemblyName: {
     type: String,
-    required: true,
+    default: '',
     trim: true
   },
   assemblyNo: {
@@ -43,7 +48,7 @@ const boothPresidentRequestSchema = new mongoose.Schema({
   },
   boothNo: {
     type: String,
-    required: true,
+    default: '',
     trim: true
   },
   isCustomBooth: {

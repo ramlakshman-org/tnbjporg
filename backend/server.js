@@ -115,7 +115,7 @@ const loginLimiter = rateLimit({
 // EPIC lookup — prevents mass voter-roll enumeration.
 const epicLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 30,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: rlMessage('Too many lookups. Please slow down and try again shortly.')
@@ -131,39 +131,25 @@ const verifyLimiter = rateLimit({
   message: rlMessage('Too many verification attempts. Please wait and try again.')
 });
 
+// Mobile existence check — prevent enumeration of registered mobiles.
+// 5 per worker × 4 workers = ~20 effective per IP per 10 min.
+const checkMobileLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rlMessage('Too many requests. Please wait and try again.')
+});
+
 app.use('/api/send-otp', otpLimiter);
 app.use('/api/verify-otp', verifyLimiter);
 app.use('/api/admin/login', loginLimiter);
 app.use(['/api/validate-epic', '/api/voter/search-epic'], epicLimiter);
+app.use('/api/check-mobile', checkMobileLimiter);
 
 // Root API Status Endpoint
 app.get('/', (req, res) => {
-  res.json({
-    status: 'ONLINE',
-    message: 'BJP Nalam Thittam API Server Operational',
-    version: '1.0.0',
-    backend_url: process.env.BACKEND_URL || 'https://bjp-scheme.onrender.com',
-    frontend_url: process.env.FRONTEND_URL || 'https://bjp-scheme.vercel.app',
-    database_connections: {
-      app_database: 'CONNECTED (Mongoose - bjp_nalam_thittam_db)',
-      voter_database: 'CONNECTED (MongoClient - voter_db)'
-    },
-    schemes_info: {
-      total_schemes: 23,
-      name: '23 Central BJP Welfare Schemes'
-    },
-    api_endpoints: {
-      root_status: 'GET /',
-      health_check: 'GET /api/health',
-      user_authentication: 'POST /api/send-otp | POST /api/verify-otp',
-      user_portal: 'POST /api/validate-epic | POST /api/register-schemes',
-      admin_authentication: 'POST /api/admin/login',
-      admin_dashboard: 'GET /api/admin/stats | GET /api/admin/applications',
-      voter_search: 'POST /api/voter/search',
-      schemes_catalog: 'GET /api/schemes',
-      referral_system: 'GET /api/referral-link/:code'
-    }
-  });
+  res.json({ status: 'ONLINE', version: '1.0.0' });
 });
 
 // API Routes

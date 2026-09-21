@@ -19,7 +19,7 @@ const sendSmsOtp = async (mobile, otp) => {
     };
   }
 
-  console.log(`[SMS Service] Attempting to send OTP ${otp} to +91${cleanMobile} using 2Factor API...`);
+  console.log(`[SMS Service] Sending OTP to +91${cleanMobile.slice(0, 3)}XXXXXXX`);
 
   try {
     const url = `https://2factor.in/API/V1/${apiKey}/SMS/${cleanMobile}/${otp}/${templateName}`;
@@ -35,20 +35,17 @@ const sendSmsOtp = async (mobile, otp) => {
     } else {
       console.warn(`[2Factor SMS Warning]: API returned non-success status ->`, response.data);
       return {
-        success: true, // fallback to allow verification in dev/test
-        sessionId: 'MOCK_SESSION_' + Date.now(),
-        message: 'OTP generated (SMS fallback active)',
-        devOtp: otp
+        success: false,
+        sessionId: null,
+        message: 'SMS gateway returned non-success status'
       };
     }
   } catch (error) {
     console.error(`[2Factor SMS Error]: ${error.message}`);
-    // Return success true with fallback devOtp so user can test seamlessly
     return {
-      success: true,
-      sessionId: 'MOCK_SESSION_' + Date.now(),
-      message: 'OTP generated (SMS gateway unavailable, using test fallback)',
-      devOtp: otp
+      success: false,
+      sessionId: null,
+      message: 'SMS gateway unavailable: ' + error.message
     };
   }
 };

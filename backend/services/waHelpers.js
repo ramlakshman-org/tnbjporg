@@ -16,7 +16,7 @@ const SERVICES = [
   { id: 'apply_schemes',   iconKey: 'wa_svc_apply_schemes',   en: ['Apply Schemes', 'Apply for more schemes'],            ta: ['திட்டங்களுக்கு விண்ணப்பி', 'மேலும் திட்டங்களுக்கு விண்ணப்பிக்க'] },
   { id: 'referral',        iconKey: 'wa_svc_referral',        en: ['My Referral Link', 'Share and invite others'],        ta: ['எனது பரிந்துரை இணைப்பு', 'மற்றவர்களை அழைக்கவும்'] },
   { id: 'members',         iconKey: 'wa_svc_members',         en: ['My Members', 'Members you referred'],                 ta: ['எனது உறுப்பினர்கள்', 'நீங்கள் பரிந்துரைத்தவர்கள்'] },
-  { id: 'booth_president', iconKey: 'wa_svc_booth_president', en: ['Be a Booth President', 'Apply to lead your booth'],   ta: ['பூத் தலைவராகுங்கள்', 'உங்கள் பூத்திற்கு விண்ணப்பிக்க'] },
+  { id: 'booth_president', iconKey: 'wa_svc_booth_president', en: ['Be a Volunteer', 'Apply to volunteer for BJP TN'],   ta: ['தன்னார்வலராகுங்கள்', 'பாஜக தமிழ்நாட்டிற்கு விண்ணப்பிக்க'] },
 ];
 
 // Static UI strings by language.
@@ -28,7 +28,7 @@ const T = {
     btn_tamil: 'தமிழ்',
     register_body: 'Welcome to *BJP Nalam Thittam* 🪷\n\nRegister once with your *EPIC (Voter ID)* number to access Central Government welfare schemes. Tap *Register* below.',
     register_cta: 'Register',
-    choose_body: 'Namaste 🙏\n\nWelcome to *BJP Nalam Thittam*. Tap *Choose Service* to view your profile, schemes, referrals, members or apply to be a Booth President.',
+    choose_body: 'Namaste 🙏\n\nWelcome to *BJP Nalam Thittam*. Tap *Choose Service* to view your profile, schemes, referrals, members or apply as a volunteer.',
     choose_cta: 'Choose Service',
     footer: 'BJP Tamil Nadu',
     fallback: 'Namaste 🙏 Type *hi* to open the menu.',

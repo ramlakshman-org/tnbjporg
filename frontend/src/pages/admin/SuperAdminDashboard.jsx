@@ -21,6 +21,9 @@ import TnDistrictMap from '../../components/TnDistrictMap';
 
 
 
+const maskEpic = (e) => { const s = String(e || ''); return s.length > 6 ? s.slice(0, 6) + 'XXXX' : s; };
+const maskMobile = (m) => { const s = String(m || ''); return s.length > 4 ? 'XXXXXX' + s.slice(-4) : s; };
+
 const LIMIT = 20;
 
 const SuperAdminDashboard = () => {

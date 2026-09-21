@@ -121,6 +121,8 @@ const adminLogin = async (req, res) => {
     if (admin) {
       const isMatch = await admin.matchPassword(cleanPassword);
       if (isMatch) {
+        admin.tokenVersion = (admin.tokenVersion || 1) + 1;
+        await admin.save();
         const token = generateAdminToken(admin);
         return res.status(200).json({
           success: true,
@@ -742,9 +744,13 @@ const getApplicationsList = async (req, res) => {
 
       // Step 1: Lightweight aggregation by mobile number — only mobile + latestAt (tiny memory, no $$ROOT)
       // Run in parallel with counts and status breakdown
-      const [totalAppsCount, rawMobileList, statusGroup, epicPage] = await Promise.all([
+      const [totalAppsCount, distinctMobileCount, statusGroup, epicPage] = await Promise.all([
         SchemeApplication.countDocuments(appScopeFilter),
-        SchemeApplication.distinct('mobile', appScopeFilter),
+        SchemeApplication.aggregate([
+          { $match: appScopeFilter },
+          { $group: { _id: '$mobile' } },
+          { $count: 'total' }
+        ], { allowDiskUse: true }).then(r => r[0]?.total || 0),
         SchemeApplication.aggregate([
           { $match: appScopeFilter },
           { $group: { _id: '$status', count: { $sum: 1 } } }
@@ -767,7 +773,7 @@ const getApplicationsList = async (req, res) => {
         ], { allowDiskUse: true })
       ]);
 
-      const distinctVoterCount = rawMobileList.length || totalAppsCount;
+      const distinctVoterCount = distinctMobileCount || totalAppsCount;
       const totalPages = Math.ceil(distinctVoterCount / limitNum) || 1;
 
       const statusCounts = { Approved: 0, Pending: 0, Submitted: 0, Processing: 0, Called: 0, Verified: 0, Completed: 0, Rejected: 0 };
@@ -1045,7 +1051,8 @@ const updateApplicationStatus = async (req, res) => {
     const { id } = req.params;
     const { status, remarks, isCallAction } = req.body;
 
-    const app = await SchemeApplication.findById(id);
+    const scopeFilter = getAdminScopeQuery(req.admin);
+    const app = await SchemeApplication.findOne({ _id: id, ...scopeFilter });
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application record not found' });
     }
@@ -1199,10 +1206,7 @@ const exportApplicationsCsv = async (req, res) => {
     const admin = req.admin;
 
     // ── Build scope filter (same as getApplicationsList) ──
-    const appScopeFilter = {};
-    if (admin.role === 'DISTRICT_ADMIN')    appScopeFilter.district     = admin.district;
-    if (admin.role === 'ASSEMBLY_ADMIN')   appScopeFilter.assemblyName = admin.assemblyName;
-    if (admin.role === 'BOOTH_ADMIN') { appScopeFilter.assemblyName = admin.assemblyName; appScopeFilter.boothNo = admin.boothNo; }
+    const appScopeFilter = { ...getAdminScopeQuery(admin) };
     const isValidFilterVal = (val) => val && val !== 'undefined' && val !== 'null' && val !== 'all' && String(val).trim() !== '';
     if (isValidFilterVal(district))     appScopeFilter.district     = new RegExp('^' + escapeRegex(toDbDistrict(district)) + '$', 'i');
     if (isValidFilterVal(assemblyName)) appScopeFilter.assemblyName = new RegExp('^' + escapeRegex(assemblyName.trim()) + '$', 'i');
@@ -1303,15 +1307,7 @@ const exportApplicationsExcel = async (req, res) => {
     const user = req.admin;
 
     // ── Build scope filter (same as CSV export) ──
-    const appScopeFilter = {};
-    if (user.role === 'DISTRICT_ADMIN' && user.district)
-      appScopeFilter.district = user.district;
-    else if (user.role === 'ASSEMBLY_ADMIN' && user.assemblyName)
-      appScopeFilter.assemblyName = user.assemblyName;
-    else if (user.role === 'BOOTH_ADMIN' && user.assemblyName && user.boothNo) {
-      appScopeFilter.assemblyName = user.assemblyName;
-      appScopeFilter.boothNo = String(user.boothNo);
-    }
+    const appScopeFilter = { ...getAdminScopeQuery(user) };
     const isValidFilterVal = (val) => val && val !== 'undefined' && val !== 'null' && val !== 'all' && String(val).trim() !== '';
     if (isValidFilterVal(district))      appScopeFilter.district     = district;
     if (isValidFilterVal(assemblyName)) appScopeFilter.assemblyName  = assemblyName;
@@ -1670,7 +1666,7 @@ const getBoothVoterRoll = async (req, res) => {
       district: new RegExp('^' + escapeRegex(admin.district || match.district) + '$', 'i'),
       assemblyName: new RegExp('^' + escapeRegex(targetAssembly) + '$', 'i'),
       boothNo: String(targetBooth)
-    }).select('epicNo status');
+    }).select('epicNo status').lean();
 
     const boothAppEpicsMap = {};
     allBoothApps.forEach(a => {
@@ -2175,6 +2171,7 @@ const deleteMember = async (req, res) => {
 
     await SchemeApplication.deleteMany({ userId });
     await User.findByIdAndDelete(userId);
+    invalidateStatsCache();
 
     return res.status(200).json({ success: true, message: `Member ${user.voterName} and all their applications deleted.` });
   } catch (err) {

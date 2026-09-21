@@ -175,9 +175,11 @@ const getCache = () => {
 }
 
 const saveCache = (card, profile, token) => {
-  localStorage.setItem(CACHE_KEY, JSON.stringify({ card, profile, timestamp: Date.now() }))
-  localStorage.setItem('bjp_last_activity', Date.now().toString())
-  if (token) localStorage.setItem('bjp_user_token', token)
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ card, profile, timestamp: Date.now() }))
+    localStorage.setItem('bjp_last_activity', Date.now().toString())
+    if (token) localStorage.setItem('bjp_user_token', token)
+  } catch { /* ignore — private/incognito mode blocks localStorage */ }
 }
 
 // Refresh the last-active timestamp (sliding expiry) without touching the data.
@@ -193,10 +195,12 @@ const touchCache = () => {
 }
 
 const clearCache = () => {
-  localStorage.removeItem(CACHE_KEY)
-  localStorage.removeItem('bjp_user_token')
-  localStorage.removeItem('bjp_last_activity')
-  localStorage.removeItem('bjp_user_data')
+  try {
+    localStorage.removeItem(CACHE_KEY)
+    localStorage.removeItem('bjp_user_token')
+    localStorage.removeItem('bjp_last_activity')
+    localStorage.removeItem('bjp_user_data')
+  } catch { /* ignore */ }
 }
 
 const maskMobile = (m) => m ? m.slice(0, 5) + 'XXXXX' : ''
@@ -3271,88 +3275,46 @@ export function SchemeWelfareCard({ card, voter, onBack, onApplySchemes }) {
   )
 }
 
-// ── Be a Booth President Panel ──────────────────────────────────────
+// ── Be a Volunteer Panel ──────────────────────────────────────
 function BoothPresidentPanel({ card, profile, onBack }) {
   const { t } = useLang()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [request, setRequest] = useState(null)
-  const [hasApplied, setHasApplied] = useState(false)
-  const [mode, setMode] = useState('choice') // 'choice', 'custom_form', 'status'
   const [error, setError] = useState(null)
   const [successMsg, setSuccessMsg] = useState(null)
 
-  // Custom location selection state
-  const [jurisdictions, setJurisdictions] = useState({ districts: [], assemblies: [] })
-  const [selectedDistrict, setSelectedDistrict] = useState('')
-  const [selectedAssembly, setSelectedAssembly] = useState('')
-  const [customBoothNo, setCustomBoothNo] = useState('')
-
-  const currentDistrict = profile?.district || card?.district || 'TAMIL NADU'
-  const currentAssembly = profile?.assemblyName || card?.assembly_name || 'Assembly'
-  const currentBooth = profile?.boothNo || card?.booth_no || '1'
   const voterName = profile?.voterName || card?.voter_name || 'BJP Member'
   const epicNo = profile?.epicNo || card?.epic_no || ''
   const mobile = profile?.mobile || card?.mobile || ''
-
-  const fetchStatus = async () => {
-    try {
-      setLoading(true)
-      const res = await chat.getMyBoothPresidentStatus()
-      if (res.success && res.hasApplied && res.request) {
-        setRequest(res.request)
-        setHasApplied(true)
-        setMode('status')
-      } else {
-        setHasApplied(false)
-        setMode('choice')
-      }
-    } catch (err) {
-      console.warn('Failed to load booth president status:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchJurisdictions = async () => {
-    try {
-      const res = await chat.getPublicJurisdictions()
-      if (res.success) {
-        setJurisdictions({
-          districts: res.districts || [],
-          assemblies: res.assemblies || []
-        })
-      }
-    } catch (err) {
-      console.warn('Failed to fetch jurisdictions:', err)
-    }
-  }
+  const district = profile?.district || card?.district || ''
+  const assemblyName = profile?.assemblyName || card?.assembly_name || ''
 
   useEffect(() => {
-    fetchStatus()
-    fetchJurisdictions()
+    (async () => {
+      try {
+        setLoading(true)
+        const res = await chat.getMyBoothPresidentStatus()
+        if (res.success && res.hasApplied && res.request) {
+          setRequest(res.request)
+        }
+      } catch (err) {
+        console.warn('Failed to load volunteer status:', err)
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
 
-  const filteredAssemblies = useMemo(() => {
-    if (!selectedDistrict) return []
-    return (jurisdictions.assemblies || []).filter(
-      a => (a.district || '').toLowerCase() === selectedDistrict.toLowerCase()
-    )
-  }, [selectedDistrict, jurisdictions.assemblies])
-
-  const handleApplyCurrentBooth = async () => {
+  const handleApply = async () => {
     try {
       setSubmitting(true)
       setError(null)
       setSuccessMsg(null)
-      const res = await chat.applyBoothPresident({
-        isCustomBooth: false
-      })
+      const res = await chat.applyBoothPresident({})
       if (res.success) {
-        setSuccessMsg(res.message || t('Your Booth President application has been submitted successfully!'))
+        setSuccessMsg(res.message || t('Your volunteer application has been submitted successfully!'))
         setRequest(res.request)
-        setHasApplied(true)
-        setMode('status')
       } else {
         setError(t(res.message || 'Failed to submit application'))
       }
@@ -3363,29 +3325,15 @@ function BoothPresidentPanel({ card, profile, onBack }) {
     }
   }
 
-  const handleApplyCustomBooth = async (e) => {
-    e.preventDefault()
-    if (!selectedDistrict || !selectedAssembly || !customBoothNo.trim()) {
-      setError(t('Please select District, Assembly, and enter Booth Number'))
-      return
-    }
-    const matchedAss = filteredAssemblies.find(a => a.assemblyName.toLowerCase() === selectedAssembly.toLowerCase())
+  const handleReApply = async () => {
     try {
       setSubmitting(true)
       setError(null)
       setSuccessMsg(null)
-      const res = await chat.applyBoothPresident({
-        isCustomBooth: true,
-        district: selectedDistrict,
-        assemblyName: selectedAssembly,
-        assemblyNo: matchedAss ? matchedAss.assemblyNo : '',
-        boothNo: customBoothNo.trim()
-      })
+      const res = await chat.applyBoothPresident({})
       if (res.success) {
-        setSuccessMsg(res.message || t('Your Booth President application has been submitted successfully!'))
+        setSuccessMsg(res.message || t('Your volunteer application has been re-submitted!'))
         setRequest(res.request)
-        setHasApplied(true)
-        setMode('status')
       } else {
         setError(t(res.message || 'Failed to submit application'))
       }
@@ -3403,6 +3351,11 @@ function BoothPresidentPanel({ card, profile, onBack }) {
     } catch { return '' }
   }
 
+  const statusColor = request?.status === 'Approved' ? '#22c55e' : request?.status === 'Rejected' ? '#ef4444' : '#f59e0b'
+  const statusBg = request?.status === 'Approved' ? 'rgba(22,163,74,0.12)' : request?.status === 'Rejected' ? 'rgba(220,38,38,0.12)' : 'rgba(217,119,6,0.12)'
+  const statusBorder = request?.status === 'Approved' ? '#16a34a' : request?.status === 'Rejected' ? '#dc2626' : '#d97706'
+  const statusIcon = request?.status === 'Approved' ? 'patch-check-fill' : request?.status === 'Rejected' ? 'x-circle-fill' : 'clock-history'
+
   return (
     <div className="chatbot-container brochure-panel">
       <header className="brochure-header">
@@ -3414,8 +3367,8 @@ function BoothPresidentPanel({ card, profile, onBack }) {
           >
             <i className="bi bi-chevron-left" />
           </button>
-          <i className="bi bi-shield-award-fill brochure-title-orange" />
-          <span>{t('Be a Booth President')}</span>
+          <i className="bi bi-person-raised-hand brochure-title-orange" />
+          <span>{t('Be a Volunteer')}</span>
         </div>
       </header>
 
@@ -3423,85 +3376,105 @@ function BoothPresidentPanel({ card, profile, onBack }) {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px 16px' }}>
             <div style={{ width: 32, height: 32, border: '3px solid var(--color-saffron, #FF9933)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 13, color: 'var(--color-ash)' }}>{t('Loading booth president status...')}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ash)' }}>{t('Loading volunteer status...')}</div>
           </div>
-        ) : mode === 'status' && request ? (
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Status Banner */}
-            <div style={{
-              padding: '16px',
-              borderRadius: '12px',
-              border: `1px solid ${request.status === 'Approved' ? '#16a34a' : request.status === 'Rejected' ? '#dc2626' : '#d97706'}`,
-              background: request.status === 'Approved' ? 'rgba(22, 163, 74, 0.12)' : request.status === 'Rejected' ? 'rgba(220, 38, 38, 0.12)' : 'rgba(217, 119, 6, 0.12)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 12
-            }}>
-              <i className={`bi bi-${request.status === 'Approved' ? 'patch-check-fill' : request.status === 'Rejected' ? 'x-circle-fill' : 'clock-history'}`} style={{
-                fontSize: 24,
-                color: request.status === 'Approved' ? '#22c55e' : request.status === 'Rejected' ? '#ef4444' : '#f59e0b',
-                flexShrink: 0
-              }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: request.status === 'Approved' ? '#22c55e' : request.status === 'Rejected' ? '#ef4444' : '#f59e0b' }}>
-                  {request.status === 'Approved' ? t('Approved as Booth President!') : request.status === 'Rejected' ? t('Application Declined') : t('Application Pending Approval')}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--color-chalk)', marginTop: 4, lineHeight: 1.4 }}>
-                  {request.status === 'Approved'
-                    ? t('Congratulations! You are official Booth President for Booth {booth} in {assembly}.', { booth: request.boothNo, assembly: request.assemblyName })
-                    : request.status === 'Rejected'
-                    ? (request.rejectionReason || t('Your application was not approved.'))
-                    : t('Your request to become Booth President for Booth {booth} ({assembly}) is pending review by your Assembly Admin.', { booth: request.boothNo, assembly: request.assemblyName })}
-                </div>
+
+            {error && (
+              <div style={{ padding: '10px 12px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', borderRadius: 8, color: '#ef4444', fontSize: 12 }}>
+                {error}
               </div>
+            )}
+            {successMsg && (
+              <div style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.15)', border: '1px solid #22c55e', borderRadius: 8, color: '#22c55e', fontSize: 12 }}>
+                {successMsg}
+              </div>
+            )}
+
+            {/* Member card */}
+            <div style={{ background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-ash)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>{t('Your Details')}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)', marginTop: 4 }}>{voterName}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ash)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {epicNo && <span><i className="bi bi-card-text" style={{ marginRight: 4 }} />{epicNo}</span>}
+                {mobile && <span><i className="bi bi-telephone" style={{ marginRight: 4 }} />{mobile}</span>}
+              </div>
+              {(district || assemblyName) && (
+                <div style={{ fontSize: 12, color: 'var(--color-saffron, #FF9933)', marginTop: 6, fontWeight: 500 }}>
+                  <i className="bi bi-geo-alt-fill" style={{ marginRight: 4 }} />
+                  {[district, assemblyName].filter(Boolean).join(' • ')}
+                </div>
+              )}
             </div>
 
-            {/* Application Overview Details */}
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-saffron, #FF9933)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <i className="bi bi-file-earmark-text" /> {t('Application Details')}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                {[
-                  { icon: 'bi-geo-alt', label: t('Target Booth'), value: `${t('Booth')} ${request.boothNo}` },
-                  { icon: 'bi-building', label: t('Constituency'), value: request.assemblyName },
-                  { icon: 'bi-map', label: t('District'), value: request.district },
-                  { icon: 'bi-clipboard-check', label: t('Application Type'), value: request.isCustomBooth ? t('Custom Selected Booth') : t('Registered Voter Booth') },
-                  { icon: 'bi-calendar-event', label: t('Applied On'), value: fmtDate(request.appliedAt) },
-                ].map((row) => (
-                  <div key={row.label} style={{ background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
-                      <i className={`bi ${row.icon}`} style={{ color: 'var(--color-saffron, #FF9933)' }} />
-                      <span>{row.label}</span>
+            {/* Status banner (if already applied) */}
+            {request && (
+              <div style={{ padding: '16px', borderRadius: '12px', border: `1px solid ${statusBorder}`, background: statusBg, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <i className={`bi bi-${statusIcon}`} style={{ fontSize: 24, color: statusColor, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: statusColor }}>
+                    {request.status === 'Approved' ? t('Approved Volunteer!') : request.status === 'Rejected' ? t('Application Declined') : t('Application Pending Approval')}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-chalk)', marginTop: 4, lineHeight: 1.4 }}>
+                    {request.status === 'Approved'
+                      ? t('Congratulations! You are an approved BJP volunteer. Share your referral link to bring in members.')
+                      : request.status === 'Rejected'
+                      ? (request.rejectionReason || t('Your application was not approved.'))
+                      : t('Your volunteer application is under review by the Super Admin.')}
+                  </div>
+                  {request.appliedAt && (
+                    <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 6 }}>
+                      {t('Applied on')} {fmtDate(request.appliedAt)}
+                      {request.actionDate ? ` · ${t('Reviewed on')} ${fmtDate(request.actionDate)}` : ''}
                     </div>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-chalk)', wordBreak: 'break-word' }}>{row.value || '-'}</span>
-                  </div>
-                ))}
-                <div style={{ background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-ash)' }}>
-                    <i className="bi bi-flag" style={{ color: 'var(--color-saffron, #FF9933)' }} />
-                    <span>{t('Status')}</span>
-                  </div>
-                  <span style={{
-                    alignSelf: 'flex-start',
-                    padding: '3px 10px',
-                    borderRadius: 12,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: request.status === 'Approved' ? 'rgba(34, 197, 94, 0.18)' : request.status === 'Rejected' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(245, 158, 11, 0.18)',
-                    color: request.status === 'Approved' ? '#16a34a' : request.status === 'Rejected' ? '#dc2626' : '#d97706'
-                  }}>
-                    {request.status}
-                  </span>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
-            {request.status === 'Rejected' && (
+            {/* Apply button — show if no application yet */}
+            {!request && (
+              <>
+                <div style={{ fontSize: 13, color: 'var(--color-ash)', lineHeight: 1.6 }}>
+                  {t('Volunteers help bring more people into the BJP Nalam Thittam programme. Apply below — the Super Admin will review your request.')}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: '13px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'var(--color-saffron, #FF9933)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8
+                  }}
+                >
+                  {submitting
+                    ? <div style={{ width: 18, height: 18, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    : <><i className="bi bi-person-raised-hand" /> {t('Apply as Volunteer')}</>}
+                </button>
+              </>
+            )}
+
+            {/* Re-apply button — only if rejected */}
+            {request?.status === 'Rejected' && (
               <button
-                onClick={() => setMode('choice')}
+                type="button"
+                onClick={handleReApply}
+                disabled={submitting}
                 style={{
-                  padding: '10px 16px',
+                  width: '100%',
+                  padding: '11px',
                   borderRadius: 8,
                   border: 'none',
                   background: 'var(--color-saffron, #FF9933)',
@@ -3515,283 +3488,12 @@ function BoothPresidentPanel({ card, profile, onBack }) {
                   gap: 8
                 }}
               >
-                <i className="bi bi-arrow-repeat" /> {t('Re-apply / Select Another Booth')}
+                {submitting
+                  ? <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : <><i className="bi bi-arrow-repeat" /> {t('Re-apply as Volunteer')}</>}
               </button>
             )}
-          </div>
-        ) : mode === 'custom_form' ? (
-          <form onSubmit={handleApplyCustomBooth} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-saffron, #FF9933)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bi bi-geo-alt-fill" /> {t('Select Custom Booth Location')}
-            </div>
 
-            {error && (
-              <div style={{ padding: '10px 12px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', borderRadius: 8, color: '#ef4444', fontSize: 12 }}>
-                {error}
-              </div>
-            )}
-
-            {/* District Selection */}
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--color-ash)', display: 'block', marginBottom: 4 }}>{t('District')} *</label>
-              <select
-                value={selectedDistrict}
-                onChange={(e) => {
-                  setSelectedDistrict(e.target.value)
-                  setSelectedAssembly('')
-                }}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  background: 'var(--color-carbon)',
-                  border: '1px solid var(--color-graphite)',
-                  color: 'var(--color-chalk)',
-                  fontSize: 13,
-                  outline: 'none'
-                }}
-              >
-                <option value="">-- {t('Select District')} --</option>
-                {jurisdictions.districts.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Assembly Selection */}
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--color-ash)', display: 'block', marginBottom: 4 }}>{t('Assembly Constituency')} *</label>
-              <select
-                value={selectedAssembly}
-                onChange={(e) => setSelectedAssembly(e.target.value)}
-                disabled={!selectedDistrict}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  background: 'var(--color-carbon)',
-                  border: '1px solid var(--color-graphite)',
-                  color: 'var(--color-chalk)',
-                  fontSize: 13,
-                  outline: 'none',
-                  opacity: selectedDistrict ? 1 : 0.5
-                }}
-              >
-                <option value="">-- {t('Select Assembly')} --</option>
-                {filteredAssemblies.map(a => (
-                  <option key={a.assemblyName} value={a.assemblyName}>{a.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Booth Number */}
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--color-ash)', display: 'block', marginBottom: 4 }}>{t('Booth Number')} *</label>
-              <input
-                type="text"
-                placeholder={t('Enter Booth Number e.g. 42')}
-                value={customBoothNo}
-                onChange={(e) => setCustomBoothNo(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  background: 'var(--color-carbon)',
-                  border: '1px solid var(--color-graphite)',
-                  color: 'var(--color-chalk)',
-                  fontSize: 13,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={() => setMode('choice')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--color-graphite)',
-                  background: 'transparent',
-                  color: 'var(--color-ash)',
-                  fontSize: 13,
-                  cursor: 'pointer'
-                }}
-              >
-                {t('Cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'var(--color-saffron, #FF9933)',
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6
-                }}
-              >
-                {submitting ? (
-                  <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                ) : (
-                  <><i className="bi bi-send-fill" /> {t('Submit Request')}</>
-                )}
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* Choice View */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {error && (
-              <div style={{ padding: '10px 12px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', borderRadius: 8, color: '#ef4444', fontSize: 12 }}>
-                {error}
-              </div>
-            )}
-            {successMsg && (
-              <div style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.15)', border: '1px solid #22c55e', borderRadius: 8, color: '#22c55e', fontSize: 12 }}>
-                {successMsg}
-              </div>
-            )}
-
-            {/* Member Details Summary Card */}
-            <div style={{ background: 'var(--color-carbon)', border: '1px solid var(--color-graphite)', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 11, color: 'var(--color-ash)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>
-                {t('Applicant Details')}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)', marginTop: 4 }}>
-                {voterName}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-ash)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <span><i className="bi bi-card-text" style={{ marginRight: 4 }} />{epicNo}</span>
-                {mobile && <span><i className="bi bi-telephone" style={{ marginRight: 4 }} />{mobile}</span>}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-saffron, #FF9933)', marginTop: 6, fontWeight: 500 }}>
-                <i className="bi bi-geo-alt-fill" style={{ marginRight: 4 }} />
-                {currentDistrict} • {currentAssembly} • {t('Booth')} {currentBooth}
-              </div>
-            </div>
-
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-chalk)' }}>
-              {t('Select how you would like to apply for Booth President:')}
-            </div>
-
-            {/* Option 1: Apply for current registered booth */}
-            <div style={{
-              background: 'var(--color-carbon)',
-              border: '1px solid var(--color-saffron, #FF9933)',
-              borderRadius: 12,
-              padding: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,153,51,0.15)', color: 'var(--color-saffron, #FF9933)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                  <i className="bi bi-check-circle-fill" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)' }}>
-                    {t('Confirm My Registered Booth')} ({t('Booth')} {currentBooth})
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2 }}>
-                    {t('Apply as Booth President for your registered voter location in {assembly}', { assembly: currentAssembly })}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleApplyCurrentBooth}
-                disabled={submitting}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'var(--color-saffron, #FF9933)',
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  marginTop: 4
-                }}
-              >
-                {submitting ? (
-                  <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                ) : (
-                  <><i className="bi bi-shield-check" /> {t('Confirm & Apply for Booth {booth}', { booth: currentBooth })}</>
-                )}
-              </button>
-            </div>
-
-            {/* Option 2: Apply for another booth */}
-            <div style={{
-              background: 'var(--color-carbon)',
-              border: '1px solid var(--color-graphite)',
-              borderRadius: 12,
-              padding: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(250,93,0,0.10)', color: 'var(--color-saffron, #FF9933)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                  <i className="bi bi-pencil-square" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-chalk)' }}>
-                    {t('Apply for Another Booth')}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-ash)', marginTop: 2 }}>
-                    {t('Choose a different District, Assembly Constituency, or Booth Number')}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDistrict(currentDistrict)
-                  setSelectedAssembly(currentAssembly)
-                  setCustomBoothNo('')
-                  setMode('custom_form')
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--color-graphite)',
-                  background: 'transparent',
-                  color: 'var(--color-chalk)',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  marginTop: 4
-                }}
-              >
-                <i className="bi bi-sliders" /> {t('Select Another Booth Location →')}
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -4857,7 +4559,7 @@ export default function ChatbotPage() {
               { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral',          desc: 'Share and invite others' },
               { icon: 'people-fill',         label: 'My Referrals',      action: 'my_referrals',      desc: 'Members you referred' },
               { icon: 'card-checklist',      label: 'Check Eligibility', action: 'check_eligibility', desc: 'See which schemes you qualify for' },
-              { icon: 'award-fill',     label: 'Be a Booth President',     action: 'be_booth_president', desc: 'Apply to lead your electoral booth' },
+              { icon: 'person-raised-hand', label: 'Be a Volunteer', action: 'be_booth_president', desc: 'Apply to volunteer for BJP TN' },
             ].map((item) => {
               const locked = !isDone
               return (
@@ -5119,7 +4821,7 @@ export default function ChatbotPage() {
                 { icon: 'link-45deg',          label: 'Referral Link',     action: 'referral' },
                 { icon: 'people-fill',         label: 'My Referrals',      action: 'my_referrals' },
                 { icon: 'card-checklist',      label: 'Check Eligibility', action: 'check_eligibility' },
-                { icon: 'award-fill',          label: 'Be a Booth President',    action: 'be_booth_president' },
+                { icon: 'person-raised-hand',   label: 'Be a Volunteer',          action: 'be_booth_president' },
               ].map((item) => {
                 return (
                   <button

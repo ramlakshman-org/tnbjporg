@@ -29,6 +29,10 @@ const adminSchema = new mongoose.Schema({
     type: String,
     default: null // Required for BOOTH_ADMIN
   },
+  tokenVersion: {
+    type: Number,
+    default: 1
+  },
   createdBy: {
     type: String,
     default: 'SYSTEM'

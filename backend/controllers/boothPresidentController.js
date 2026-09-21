@@ -2,24 +2,13 @@ const BoothPresidentRequest = require('../models/BoothPresidentRequest');
 const User = require('../models/User');
 const { getAssemblyMetadata } = require('../services/jurisdictionService');
 
-// @desc    Apply to be a Booth President
+// @desc    Apply to be a Volunteer
 // @route   POST /api/booth-president/apply
 const applyBoothPresident = async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    const { isCustomBooth, district, assemblyName, assemblyNo, boothNo } = req.body;
-
-    const targetDistrict = (isCustomBooth && district ? district : user.district || 'TAMIL NADU').trim();
-    const targetAssembly = (isCustomBooth && assemblyName ? assemblyName : user.assemblyName || 'Assembly').trim();
-    const targetAssemblyNo = (isCustomBooth && assemblyNo ? assemblyNo : user.assemblyNo || '').toString().trim();
-    const targetBoothNo = (isCustomBooth && boothNo ? boothNo : user.boothNo || '1').toString().trim();
-
-    if (!targetDistrict || !targetAssembly || !targetBoothNo) {
-      return res.status(400).json({ success: false, message: 'District, Assembly, and Booth Number are required' });
     }
 
     // Check existing request
@@ -29,24 +18,25 @@ const applyBoothPresident = async (req, res) => {
       if (existing.status === 'Approved') {
         return res.status(400).json({
           success: false,
-          message: 'You are already an approved Booth President.',
+          message: 'You are already an approved volunteer.',
           request: existing
         });
       }
 
-      // Re-apply or update existing pending/rejected request
+      // Re-apply: update existing pending/rejected record
+      existing.type = 'volunteer';
       existing.voterName = user.voterName;
       existing.epicNo = user.epicNo;
       existing.mobile = user.mobile;
       existing.gender = user.gender || 'Unspecified';
-      existing.district = targetDistrict;
-      existing.assemblyName = targetAssembly;
-      existing.assemblyNo = targetAssemblyNo;
-      existing.boothNo = targetBoothNo;
-      existing.isCustomBooth = !!isCustomBooth;
-      existing.originalDistrict = user.district || '';
-      existing.originalAssembly = user.assemblyName || '';
-      existing.originalBoothNo = user.boothNo || '';
+      existing.district = user.district || '';
+      existing.assemblyName = user.assemblyName || '';
+      existing.assemblyNo = user.assemblyNo || '';
+      existing.boothNo = '';
+      existing.isCustomBooth = false;
+      existing.originalDistrict = '';
+      existing.originalAssembly = '';
+      existing.originalBoothNo = '';
       existing.status = 'Pending';
       existing.rejectionReason = '';
       existing.appliedAt = new Date();
@@ -57,37 +47,35 @@ const applyBoothPresident = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        message: 'Your Booth President application has been submitted successfully!',
+        message: 'Your volunteer application has been submitted successfully!',
         request: existing
       });
     }
 
     const newRequest = await BoothPresidentRequest.create({
+      type: 'volunteer',
       userId: user._id,
       voterName: user.voterName,
       epicNo: user.epicNo,
       mobile: user.mobile,
       gender: user.gender || 'Unspecified',
-      district: targetDistrict,
-      assemblyName: targetAssembly,
-      assemblyNo: targetAssemblyNo,
-      boothNo: targetBoothNo,
-      isCustomBooth: !!isCustomBooth,
-      originalDistrict: user.district || '',
-      originalAssembly: user.assemblyName || '',
-      originalBoothNo: user.boothNo || '',
+      district: user.district || '',
+      assemblyName: user.assemblyName || '',
+      assemblyNo: user.assemblyNo || '',
+      boothNo: '',
+      isCustomBooth: false,
       status: 'Pending',
       appliedAt: new Date()
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Your Booth President application has been submitted successfully!',
+      message: 'Your volunteer application has been submitted successfully!',
       request: newRequest
     });
   } catch (error) {
-    console.error('[applyBoothPresident Error]:', error);
-    return res.status(500).json({ success: false, message: 'Failed to submit Booth President application' });
+    console.error('[applyVolunteer Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit volunteer application' });
   }
 };
 
@@ -217,13 +205,17 @@ const getAdminBoothPresidentRequests = async (req, res) => {
   }
 };
 
-// @desc    Approve or Reject a Booth President Request
+// @desc    Approve or Reject a Volunteer Request — Super Admin only
 // @route   POST /api/admin/booth-president-requests/:id/action
 const handleBoothPresidentAction = async (req, res) => {
   try {
     const admin = req.admin;
     if (!admin) {
       return res.status(401).json({ success: false, message: 'Admin authentication required' });
+    }
+
+    if (admin.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Only Super Admin can approve or reject volunteer requests' });
     }
 
     const { id } = req.params;
@@ -235,14 +227,7 @@ const handleBoothPresidentAction = async (req, res) => {
 
     const request = await BoothPresidentRequest.findById(id);
     if (!request) {
-      return res.status(404).json({ success: false, message: 'Booth President request not found' });
-    }
-
-    // Assembly Admin boundary validation
-    if (admin.role === 'ASSEMBLY_ADMIN' && admin.assemblyName) {
-      if (request.assemblyName.toLowerCase() !== admin.assemblyName.toLowerCase()) {
-        return res.status(403).json({ success: false, message: 'Unauthorized action outside assigned assembly' });
-      }
+      return res.status(404).json({ success: false, message: 'Volunteer request not found' });
     }
 
     request.status = action;
@@ -254,12 +239,12 @@ const handleBoothPresidentAction = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Booth President application ${action} successfully!`,
+      message: `Volunteer application ${action} successfully!`,
       request
     });
   } catch (error) {
-    console.error('[handleBoothPresidentAction Error]:', error);
-    return res.status(500).json({ success: false, message: 'Failed to process request action' });
+    console.error('[handleVolunteerAction Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to process volunteer request' });
   }
 };
 
