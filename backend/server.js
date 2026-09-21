@@ -158,7 +158,6 @@ app.use('/api/booth-president', boothPresidentRoutes);
 app.use('/api/voter', voterRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin', boothPresidentRoutes);
 app.use('/api/admin/flow-images', flowImagesRoutes);
 app.use('/api/referrals', referralRoutes);
 

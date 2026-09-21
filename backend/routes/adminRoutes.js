@@ -29,6 +29,7 @@ const {
   updateScheme,
   deleteScheme
 } = require('../controllers/schemeAdminController');
+const { getAdminBoothPresidentRequests, handleBoothPresidentAction } = require('../controllers/boothPresidentController');
 const { protectAdmin, authorizeRoles } = require('../middleware/authMiddleware');
 
 router.post('/login', adminLogin);
@@ -57,6 +58,10 @@ router.get('/credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllAd
 // ── Member management (SUPER_ADMIN only) ──
 router.delete('/members/:userId', protectAdmin, authorizeRoles('SUPER_ADMIN'), deleteMember);
 router.get('/scheme-suggestions', protectAdmin, authorizeRoles('SUPER_ADMIN'), getSchemeSuggestions);
+
+// ── Booth President management ──
+router.get('/booth-president-requests', protectAdmin, getAdminBoothPresidentRequests);
+router.post('/booth-president-requests/:id/action', protectAdmin, handleBoothPresidentAction);
 
 // ── Scheme management (SUPER_ADMIN only) ──
 router.get('/schemes', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllSchemesAdmin);

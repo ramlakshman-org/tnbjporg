@@ -118,7 +118,7 @@
   - Test: `nginx -t` passes. Load site, check browser console for CSP violations
   - Deploy: `nginx -s reload`
 
-- [ ] **TASK-15** · ISSUE-08 · Remove `boothPresidentRoutes` dual mount
+- [x] **TASK-15** · ISSUE-08 · Remove `boothPresidentRoutes` dual mount
   - File: `backend/server.js:175`
   - Change: Remove `app.use('/api/admin', boothPresidentRoutes)` line; move admin-facing endpoints into `adminRoutes.js`
   - Test: All existing `/api/booth-president/*` routes still work; confirm `/api/admin/jurisdictions` no longer responds
@@ -212,7 +212,7 @@
 | TASK-12 | ISSUE-04 | CRITICAL | ⏸ Deferred | Audit 1 | — |
 | TASK-13 | ISSUE-09 | HIGH | ✅ Done | Audit 1 | 2026-09-21 |
 | TASK-14 | ISSUE-15 | LOW | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-15 | ISSUE-08 | MEDIUM | ⏸ Pending | Audit 1 | — |
+| TASK-15 | ISSUE-08 | MEDIUM | ✅ Done | Audit 1 | 2026-09-21 |
 | TASK-16 | ISSUE-07 | HIGH | ✅ Done | Audit 1 | 2026-09-21 |
 | TASK-17 | NEW-01 | HIGH | ✅ Done | Audit 2 | 2026-09-21 |
 | TASK-18 | NEW-02 | MEDIUM | ✅ Done | Audit 2 | 2026-09-21 |
