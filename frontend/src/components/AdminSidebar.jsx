@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  LayoutDashboard, Users, Building, Shield, LogOut, ChevronLeft, ChevronRight, KeyRound, BarChart3, MapPin, FileText, ShieldCheck, Gift, MessageCircle
+  LayoutDashboard, Users, Building, Shield, LogOut, ChevronLeft, ChevronRight, KeyRound, BarChart3, MapPin, FileText, ShieldCheck, Gift, MessageCircle, UserX
 } from 'lucide-react';
 
 /**
@@ -25,6 +25,7 @@ const AdminSidebar = ({
         return [
           { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
           { id: 'applications', label: 'Scheme Applications', icon: Users },
+          { id: 'incomplete_registrations', label: 'Incomplete Registrations', icon: UserX },
           { id: 'schemes', label: 'Manage Schemes', icon: Gift },
           { id: 'flow_images', label: 'WhatsApp Flow Images', icon: MessageCircle },
           { id: 'booth_presidents', label: 'Volunteer Requests', icon: ShieldCheck },
@@ -40,6 +41,7 @@ const AdminSidebar = ({
           { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
           { id: 'districts', label: 'District Breakdown', icon: Building },
           { id: 'applications', label: 'Scheme Applications', icon: Users },
+          { id: 'incomplete_registrations', label: 'Incomplete Registrations', icon: UserX },
           { id: 'booth_presidents', label: 'Volunteer Requests', icon: ShieldCheck },
           { id: 'reports', label: 'Reports', icon: BarChart3 },
           { id: 'logins', label: 'Assembly Logins', icon: KeyRound }

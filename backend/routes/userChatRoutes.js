@@ -9,7 +9,8 @@ const {
   registerSchemes,
   getReferralLink,
   getMyMembers,
-  getMemberStatus
+  getMemberStatus,
+  updateEpic
 } = require('../controllers/userChatController');
 const { protectUser } = require('../middleware/authMiddleware');
 
@@ -24,5 +25,6 @@ router.post('/register-schemes', registerSchemes);
 router.get('/referral-link/:ntCode', protectUser, getReferralLink);
 router.get('/my-members/:ntCode', protectUser, getMyMembers);
 router.get('/member-status/:ntCode', protectUser, getMemberStatus);
+router.patch('/update-epic', protectUser, updateEpic);
 
 module.exports = router;

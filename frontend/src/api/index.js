@@ -102,6 +102,9 @@ export const chat = {
   getSchemes: () =>
     api.get('/api/schemes/list'),
 
+  volunteerRegister: (data) =>
+    api.post('/api/booth-president/volunteer-register', data),
+
   applyBoothPresident: (data) =>
     api.post('/api/booth-president/apply', data),
 
@@ -116,4 +119,7 @@ export const chat = {
 
   getMySchemes: () =>
     api.get('/api/schemes/my-requests'),
+
+  updateEpic: (epicNo) =>
+    api.patch('/api/update-epic', { epicNo }),
 }

@@ -5,6 +5,7 @@ const Admin = require('../models/Admin');
 const User = require('../models/User');
 const SchemeApplication = require('../models/SchemeApplication');
 const SchemeSuggestion = require('../models/SchemeSuggestion');
+const IncompleteRegistration = require('../models/IncompleteRegistration');
 const { BJP_SCHEMES } = require('../constants/schemes');
 
 // Resolve a stored schemeName (often the numeric scheme id, since the chatbot
@@ -2217,6 +2218,54 @@ const getSchemeSuggestions = async (req, res) => {
   }
 };
 
+// @desc    List people who verified OTP but never completed registration
+// @route   GET /api/admin/incomplete-registrations
+// @access  SUPER_ADMIN, STATE_ADMIN
+const getIncompleteRegistrations = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const stageFilter = req.query.stage;
+    const searchRaw = (req.query.search || '').trim();
+
+    const query = {};
+    if (stageFilter && ['OTP_VERIFIED', 'EPIC_VERIFIED'].includes(stageFilter)) {
+      query.stage = stageFilter;
+    }
+    if (searchRaw) {
+      const safe = escapeRegex(searchRaw);
+      query.$or = [
+        { mobile: new RegExp(safe, 'i') },
+        { epicNo: new RegExp(safe, 'i') },
+        { voterName: new RegExp(safe, 'i') },
+        { district: new RegExp(safe, 'i') }
+      ];
+    }
+
+    const [total, records] = await Promise.all([
+      IncompleteRegistration.countDocuments(query),
+      IncompleteRegistration.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      records
+    });
+  } catch (error) {
+    console.error('[getIncompleteRegistrations Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch incomplete registrations' });
+  }
+};
+
 module.exports = {
   adminLogin,
   warmStatsCache,
@@ -2240,5 +2289,6 @@ module.exports = {
   getTrends,
   getCoverage,
   deleteMember,
-  getSchemeSuggestions
+  getSchemeSuggestions,
+  getIncompleteRegistrations
 };

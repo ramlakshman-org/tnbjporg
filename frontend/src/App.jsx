@@ -6,6 +6,7 @@ import ChatbotPage from './pages/ChatbotPage';
 import ReferralPage from './pages/ReferralPage';
 import Navbar from './components/Navbar';
 import AdminPortal from './pages/AdminPortal';
+import VolunteerRegistrationPage from './pages/VolunteerRegistrationPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
 const MainAppContent = () => {
@@ -15,6 +16,7 @@ const MainAppContent = () => {
 
   const isAdminRoute = currentPath.startsWith('/admin');
   const isReferralRoute = currentPath.startsWith('/r/');
+  const isVolunteerRoute = currentPath === '/volunteer-registration';
 
   // 1. Render Admin Portal if URL starts with /admin
   if (isAdminRoute) {
@@ -25,13 +27,17 @@ const MainAppContent = () => {
     );
   }
 
-
   // 2. Render Referral Handler if URL is /r/:ntCode
   if (isReferralRoute) {
     return <ReferralPage />;
   }
 
-  // 3. Render New Conversational Automation User Portal
+  // 3. Render direct Volunteer Registration page
+  if (isVolunteerRoute) {
+    return <VolunteerRegistrationPage />;
+  }
+
+  // 4. Render New Conversational Automation User Portal
   return (
     <LanguageProvider>
       <ChatbotPage />

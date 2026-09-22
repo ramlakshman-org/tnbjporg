@@ -5,7 +5,8 @@ const {
   getMyBoothPresidentStatus,
   getPublicJurisdictions,
   getAdminBoothPresidentRequests,
-  handleBoothPresidentAction
+  handleBoothPresidentAction,
+  volunteerRegister
 } = require('../controllers/boothPresidentController');
 const { protectUser, protectAdmin } = require('../middleware/authMiddleware');
 
@@ -13,6 +14,9 @@ const { protectUser, protectAdmin } = require('../middleware/authMiddleware');
 router.post('/apply', protectUser, applyBoothPresident);
 router.get('/my-status', protectUser, getMyBoothPresidentStatus);
 router.get('/jurisdictions', getPublicJurisdictions);
+
+// Direct volunteer registration (OTP-session auth, no prior account needed)
+router.post('/volunteer-register', volunteerRegister);
 
 // Admin endpoints (mounted at /api/admin in server.js → /api/admin/booth-president-requests)
 router.get('/booth-president-requests', protectAdmin, getAdminBoothPresidentRequests);

@@ -8,6 +8,7 @@ import '../styles/chatbot.css'
 import { useLang } from '../i18n/LanguageContext'
 import { getSchemeBgImage } from '../components/MemberProfileTimelineView'
 import { useMergedSchemes, adaptToNtShape, adaptToSchemesShape, getDynamicSchemeWaLogoById } from '../utils/schemesData'
+import tnLocations from '../data/tn-locations.json'
 
 // Reactive viewport check — true on mobile / small-tablet widths.
 function useIsMobile(maxWidth = 768) {
@@ -267,6 +268,118 @@ const FINAL_BANNER_URL = 'https://res.cloudinary.com/dkjrdntf/image/upload/f_aut
 if (typeof window !== 'undefined') {
   const _bannerPreload = new Image();
   _bannerPreload.src = FINAL_BANNER_URL;
+}
+
+// ── No-EPIC location form (renders inside chat as a bot message) ──────────────
+function LocationFormMsg({ onSubmit, disabled }) {
+  const { t } = useLang()
+  const districts = Object.keys(tnLocations).sort()
+  const [name, setName] = useState('')
+  const [district, setDistrict] = useState('')
+  const [assembly, setAssembly] = useState('')
+  const assemblies = district ? (tnLocations[district] || []) : []
+
+  const canSubmit = name.trim().length >= 2 && district && assembly
+
+  const sel = {
+    padding: '10px 12px', border: '1.5px solid #e5e7eb', borderRadius: '10px',
+    fontSize: '14px', width: '100%', background: '#fff', outline: 'none',
+    appearance: 'none', WebkitAppearance: 'none', color: '#111827',
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\'%3E%3Cpath fill=\'%236b7280\' d=\'M7 10l5 5 5-5z\'/%3E%3C/svg%3E")',
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+    paddingRight: '32px', cursor: 'pointer'
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('Your Name')}</label>
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder={t('Enter your full name')}
+          disabled={disabled}
+          style={{ padding: '10px 12px', border: '1.5px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', width: '100%', outline: 'none', boxSizing: 'border-box' }}
+        />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('District')}</label>
+        <select value={district} onChange={e => { setDistrict(e.target.value); setAssembly('') }} disabled={disabled} style={sel}>
+          <option value="">{t('Select District')}</option>
+          {districts.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('Assembly Constituency')}</label>
+        <select value={assembly} onChange={e => setAssembly(e.target.value)} disabled={disabled || !district} style={sel}>
+          <option value="">{district ? t('Select Assembly') : t('Select district first')}</option>
+          {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+      <button
+        onClick={() => canSubmit && !disabled && onSubmit({ name: name.trim(), district, assembly })}
+        disabled={!canSubmit || disabled}
+        style={{
+          padding: '12px', background: canSubmit && !disabled ? '#FF6B00' : '#fbd5b0',
+          color: '#fff', border: 'none', borderRadius: '10px',
+          fontSize: '14px', fontWeight: '600', cursor: canSubmit && !disabled ? 'pointer' : 'not-allowed', width: '100%'
+        }}
+      >
+        {t('Confirm & Continue →')}
+      </button>
+    </div>
+  )
+}
+
+// ── EPIC pending prompt (shown after login when epicNo = PND-...) ─────────────
+function EpicPendingPrompt({ onVerify, loading }) {
+  const { t } = useLang()
+  const [val, setVal] = useState('')
+  const clean = val.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const letters = clean.slice(0, 3).replace(/[^A-Z]/g, '')
+  const digits  = clean.slice(3).replace(/[^0-9]/g, '').slice(0, 7)
+  const epic = letters + digits
+  const ready = /^[A-Z]{3}\d{7}$/.test(epic)
+
+  return (
+    <div style={{ background: '#FFF4EC', border: '1.5px solid #FFD4B0', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '20px' }}>🪪</span>
+        <div>
+          <div style={{ fontWeight: '700', fontSize: '14px', color: '#92400e' }}>{t('Add Your Voter ID')}</div>
+          <div style={{ fontSize: '12px', color: '#b45309' }}>{t('Enter EPIC to verify your identity')}</div>
+        </div>
+      </div>
+      <input
+        type="text"
+        value={epic}
+        onChange={e => {
+          const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+          const l = v.slice(0,3).replace(/[^A-Z]/g,'')
+          const d = v.slice(3).replace(/[^0-9]/g,'').slice(0,7)
+          setVal(l + d)
+        }}
+        placeholder="ABC1234567"
+        maxLength={10}
+        disabled={loading}
+        style={{ padding: '10px 12px', border: '1.5px solid #FFD4B0', borderRadius: '10px', fontSize: '15px', fontWeight: '600', letterSpacing: '0.1em', outline: 'none', width: '100%', boxSizing: 'border-box', background: '#fff' }}
+      />
+      <button
+        onClick={() => ready && !loading && onVerify(epic)}
+        disabled={!ready || loading}
+        style={{
+          padding: '11px', background: ready && !loading ? '#FF6B00' : '#fbd5b0',
+          color: '#fff', border: 'none', borderRadius: '10px',
+          fontSize: '14px', fontWeight: '600', cursor: ready && !loading ? 'pointer' : 'not-allowed', width: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+        }}
+      >
+        {loading ? <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> : null}
+        {t('Verify Voter ID')}
+      </button>
+    </div>
+  )
 }
 
 // ── Message renderers ───────────────────────────────────────
@@ -2560,6 +2673,24 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
   const [profileData, setProfileData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [epicLoading, setEpicLoading] = useState(false)
+  const [epicError, setEpicError] = useState(null)
+
+  const handleEpicUpdate = async (newEpic) => {
+    setEpicLoading(true)
+    setEpicError(null)
+    try {
+      const res = await chat.updateEpic(newEpic)
+      setEpicLoading(false)
+      setProfileData(prev => ({
+        ...prev,
+        user: { ...(prev?.user || prev || {}), ...res.user }
+      }))
+    } catch (err) {
+      setEpicLoading(false)
+      setEpicError(err?.message || 'Voter ID not found. Please check and try again.')
+    }
+  }
 
   useEffect(() => {
     if (!epicNo) {
@@ -2639,6 +2770,16 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
             padding: '10px 0',
             boxShadow: 'none'
           }}>
+            {/* Add Voter ID banner — only for PND- users */}
+            {userEpic.startsWith('PND-') && (
+              <div>
+                <EpicPendingPrompt onVerify={handleEpicUpdate} loading={epicLoading} />
+                {epicError && (
+                  <div style={{ color: '#ff3b30', fontSize: 13, marginTop: 6, textAlign: 'center' }}>❌ {t(epicError)}</div>
+                )}
+              </div>
+            )}
+
             {/* Header Name & Role Badge */}
             <div style={{ textAlign: 'center', marginBottom: 8 }}>
               <h3 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-chalk)', marginBottom: 4 }}>{voterName}</h3>
@@ -2665,7 +2806,9 @@ function FullProfilePanel({ epicNo, mobile, referredCount, onBack }) {
                   <i className="bi bi-card-text" style={{ color: '#FF9933' }} />
                   <span>{t('EPIC Number')}</span>
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-chalk)', fontFamily: 'monospace' }}>{userEpic}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: userEpic.startsWith('PND-') ? '#b45309' : 'var(--color-chalk)', fontFamily: 'monospace' }}>
+                  {userEpic.startsWith('PND-') ? t('Voter ID Pending') : userEpic}
+                </span>
               </div>
 
               {/* Mobile Number */}
@@ -3617,6 +3760,9 @@ export default function ChatbotPage() {
   const [referredCount, setReferredCount] = useState(0)
   const [mySchemeToast, setMySchemeToast] = useState(false)
 
+  // No-EPIC flow
+  const [noEpicMode, setNoEpicMode] = useState(false)
+
   // Snapshot of the user's scheme applications (status + history length) for
   // detecting admin status updates during polling.
   const schemeSnapshotRef = useRef(null)
@@ -4047,6 +4193,7 @@ export default function ChatbotPage() {
         return
       }
       // Verified and no existing registration → start a new registration.
+      setNoEpicMode(false)
       await botSay(t('✅ Mobile verified! You are not registered yet — enter your EPIC Number (Voter ID) to continue.'), 300)
       await botSay(t('📋 Format: 3 letters + 7 digits  e.g. ABC1234567'), 200)
       setChatState(S.AWAIT_EPIC)
@@ -4181,8 +4328,25 @@ export default function ChatbotPage() {
     addMsg('user', 'text', { text: t('↩ Try Again') })
     epicRef.current = ''
     voterRef.current = null
+    setNoEpicMode(false)
     await botSay(t('📋 Please enter your EPIC Number again.'), 300)
     setChatState(S.AWAIT_EPIC)
+  }
+
+  const handleNoEpicToggle = async () => {
+    setNoEpicMode(true)
+    addMsg('user', 'text', { text: t("I don't have my Voter ID card") })
+    epicRef.current = ''
+    await botSay(t('No problem! Enter your name and select your district & assembly constituency:'), 400)
+    addMsg('bot', 'location_form', {})
+  }
+
+  const handleLocationSubmit = async ({ name, district, assembly }) => {
+    addMsg('user', 'text', { text: `${name} · ${district} · ${assembly}` })
+    voterRef.current = { name, district, assembly, part_no: '0', gender: 'Unspecified', epic_no: '' }
+    await botSay(t('✅ Details noted! Please confirm:'), 200)
+    addMsg('bot', 'voter_card', { voter: voterRef.current })
+    setChatState(S.CONFIRM)
   }
 
   const handleSchemesSubmit = async (selectedIds) => {
@@ -4338,6 +4502,7 @@ export default function ChatbotPage() {
       case S.AWAIT_OTP:
         return { type: 'tel', placeholder: t('Enter 6-digit OTP'), maxLength: 6, inputMode: 'numeric' }
       case S.AWAIT_EPIC:
+        if (noEpicMode) return null
         return { type: 'text', placeholder: t('EPIC Number (e.g. ABC1234567)'), maxLength: 10, inputMode: epicNumericMode ? 'numeric' : 'text' }
       default:
         return null
@@ -4425,6 +4590,15 @@ export default function ChatbotPage() {
       }
       case 'welcome_banner':
         return <WelcomeBannerMsg onStart={handleStart} />
+      case 'location_form': {
+        const isLatest = messages[messages.length - 1]?.id === msg.id
+        return (
+          <LocationFormMsg
+            onSubmit={handleLocationSubmit}
+            disabled={!isLatest || isTyping || chatState !== S.AWAIT_EPIC}
+          />
+        )
+      }
       case 'voter_card': {
         const isLatest = messages[messages.length - 1]?.id === msg.id
         return (
@@ -4705,6 +4879,20 @@ export default function ChatbotPage() {
 
               <div ref={messagesEndRef} style={{ height: 8 }} />
             </main>
+
+            {/* No-EPIC toggle (only during EPIC entry, before user switches mode) */}
+            {chatState === S.AWAIT_EPIC && !noEpicMode && (
+              <div style={{ textAlign: 'center', padding: '6px 16px' }}>
+                <button
+                  type="button"
+                  onClick={handleNoEpicToggle}
+                  disabled={isTyping}
+                  style={{ background: 'none', border: 'none', color: '#FF6B00', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                >
+                  {t("Don't have Voter ID card? Register with District & Assembly →")}
+                </button>
+              </div>
+            )}
 
             {/* Resend OTP bar (only during OTP entry) */}
             {chatState === S.AWAIT_OTP && (

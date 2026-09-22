@@ -194,6 +194,35 @@
 
 ---
 
+## PHASE 8 — Analytics & Reporting Enhancement
+
+- [x] **TASK-24** · FEAT-01 · Analytics & Reports — Deploy current Analytics tab build
+  - Frontend: `ReportsView.jsx` — tab switcher (Report Data | Analytics), TrendsChart, SchemePieChart, district table, assembly table, incomplete registrations summary
+  - Built 2026-09-22. Deployed 2026-09-22.
+  - Deploy: `scp assets/index-CxpqVX-6-v2.js` → `/var/www/bjptn/dist/assets/` then `scp index.html` → `/var/www/bjptn/dist/`
+  - Note: tasks.md had wrong path (`/var/www/bjptn/frontend/dist/` — does not exist). Correct path is `/var/www/bjptn/dist/`
+
+- [x] **TASK-25** · FEAT-02 · Separate Analytics Exports — 5 focused Excel downloads
+
+- [x] **TASK-26** · FEAT-03 · Optional EPIC Registration — District & Assembly fallback + Add EPIC Later
+  - **Flow:** At EPIC step, user can toggle "Don't have Voter ID?" → enters Name + District + Assembly instead
+  - **Backend:** `epicNo` stored as `PND-{mobile}` when no EPIC given. New `PATCH /api/update-epic` endpoint (protectUser) verifies EPIC against voter DB and cascades update to User + all SchemeApplications
+  - **Frontend:** Toggle in `ChatbotPage.jsx` (AWAIT_EPIC state) + `VolunteerRegistrationPage.jsx` (Step 3). On next login, if `epicPending: true` returned, inline EPIC prompt shown on member card screen
+  - **Data:** `src/data/tn-locations.json` — 38 districts × 234 assemblies from existing geojson
+  - Bundle: `index-CrRzdcfE-v2.js`
+  - **Backend:** New function `exportAnalyticsExcel` in `adminController.js` + new route `GET /api/admin/export-analytics?type=...`
+    - `type=datewise` → Sheet: Date / Registrations (last N days, configurable via `?days=14|30|90`)
+    - `type=districtwise` → Sheet: District / Total / Approved / Pending / Rejected / Share %
+    - `type=schemewise` → Sheet: Scheme Name / Full Title / Total / Share % (all 23 schemes)
+    - `type=assemblywise` → Sheet: Assembly / District / Total / Approved / Pending / Rejected
+    - `type=incomplete` → Sheet: Full incomplete registrations list (Mobile / Stage / EPIC / Name / District / Assembly / Captured Date)
+  - **Frontend:** Each Analytics tab section gets its own `↓ Export` button
+  - Reuses data already computed by `getTrends`, `getDashboardStats`, `getIncompleteRegistrations` — no new DB queries
+  - Test: Each export type generates correct Excel with title block, header row, data rows
+  - Deploy: Backend `scp` + `pm2 reload bjptn-backend` · Frontend `scp dist/`
+
+---
+
 ## Progress Tracker
 
 | Task | Issue | Severity | Status | Found | Fixed Date |
@@ -221,3 +250,6 @@
 | TASK-21 | NEW-05 | LOW | ✅ Done | Audit 2 | 2026-09-21 |
 | TASK-22 | NEW-06 | LOW | Deferred | Audit 2 | — |
 | TASK-23 | NEW-07 | INFO | ✅ Done | Audit 2 | 2026-09-21 |
+| TASK-24 | FEAT-01 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |
+| TASK-25 | FEAT-02 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |
+| TASK-26 | FEAT-03 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |

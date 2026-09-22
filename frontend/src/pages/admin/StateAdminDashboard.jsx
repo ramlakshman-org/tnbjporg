@@ -15,6 +15,7 @@ import CoverageTable from '../../components/CoverageTable';
 import AdminSidebar from '../../components/AdminSidebar';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import BoothPresidentRequestsView from '../../components/BoothPresidentRequestsView';
+import IncompleteRegistrationsView from '../../components/IncompleteRegistrationsView';
 import TnDistrictMap from '../../components/TnDistrictMap';
 
 const LIMIT = 20;
@@ -1046,6 +1047,10 @@ const StateAdminDashboard = () => {
           </div>
           {renderPagination(boothStatsPage, statsData.boothStats?.length || 0, 15, setBoothStatsPage)}
         </div>
+      )}
+
+      {subPage === 'incomplete_registrations' && (
+        <IncompleteRegistrationsView />
       )}
 
       {/* PAGE: BOOTH PRESIDENT REQUESTS */}

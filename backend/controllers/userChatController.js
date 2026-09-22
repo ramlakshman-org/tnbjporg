@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const OtpSession = require('../models/OtpSession');
 const SchemeApplication = require('../models/SchemeApplication');
+const IncompleteRegistration = require('../models/IncompleteRegistration');
 const { getVoterDbClient } = require('../config/db');
 const { sendSmsOtp } = require('../services/smsService');
 const { findVoterByEpic } = require('../services/voterSearchService');
@@ -144,10 +145,18 @@ const verifyOtp = async (req, res) => {
         voter_name: existingUser.voterName,
         bjp_code: existingUser.referralCode,
         referral_link: referralLink,
+        epicPending: existingUser.epicNo.startsWith('PND-'),
         token,
         user: existingUser
       });
     } else {
+      // New user — capture them as an incomplete registration so no lead is lost
+      IncompleteRegistration.updateOne(
+        { mobile: cleanMobile },
+        { $set: { stage: 'OTP_VERIFIED', verifiedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      ).catch((err) => console.error('[verifyOtp] IncompleteRegistration upsert error:', err.message));
+
       return res.status(200).json({
         success: true,
         message: 'OTP verified successfully. Please provide your EPIC number.',
@@ -223,6 +232,22 @@ const validateEpic = async (req, res) => {
         success: false,
         message: `EPIC '${cleanEpic}' not found in Tamil Nadu Voter Roll. Please check your voter ID card.`
       });
+    }
+
+    // Upgrade stage if there is a pending incomplete registration for this mobile
+    if (mobile) {
+      const cleanMobile2 = String(mobile).trim();
+      IncompleteRegistration.updateOne(
+        { mobile: cleanMobile2 },
+        { $set: {
+          stage: 'EPIC_VERIFIED',
+          epicNo: foundDoc.epic_no,
+          voterName: foundDoc.name,
+          district: foundDoc.district,
+          assemblyName: foundDoc.assembly,
+          boothNo: String(foundDoc.part_no || '')
+        }}
+      ).catch((err) => console.error('[validateEpic] IncompleteRegistration update error:', err.message));
     }
 
     return res.status(200).json({
@@ -340,7 +365,7 @@ const registerSchemes = async (req, res) => {
 
       user = await User.create({
         mobile: cleanMobile || '0000000000',
-        epicNo: cleanEpic || ('TEMP-' + Date.now()),
+        epicNo: cleanEpic || ('PND-' + cleanMobile),
         voterName: cleanName,
         district: cleanDist,
         assemblyName: cleanAss,
@@ -402,6 +427,12 @@ const registerSchemes = async (req, res) => {
     }
 
     const token = generateToken(user._id, user.tokenVersion || 1);
+
+    // Registration complete — remove from incomplete leads list
+    if (cleanMobile) {
+      IncompleteRegistration.deleteOne({ mobile: cleanMobile })
+        .catch((err) => console.error('[registerSchemes] IncompleteRegistration deleteOne error:', err.message));
+    }
 
     return res.status(200).json({
       success: true,
@@ -511,6 +542,76 @@ const getMemberStatus = async (req, res) => {
   }
 };
 
+// @desc    Update EPIC for a user who registered without one (PND- placeholder)
+// @route   PATCH /api/update-epic
+const updateEpic = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+    if (!user.epicNo.startsWith('PND-')) {
+      return res.status(400).json({ success: false, message: 'Voter ID already verified for this account.' });
+    }
+
+    const epicNo = (req.body.epicNo || req.body.epic_no || '').trim().toUpperCase();
+    if (!epicNo || !/^[A-Z]{3}\d{7}$/.test(epicNo)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid EPIC number (e.g. ABC1234567).' });
+    }
+
+    const result = await findVoterByEpic(epicNo);
+    if (!result || !result.doc) {
+      return res.status(404).json({
+        success: false,
+        message: `EPIC '${epicNo}' not found in Tamil Nadu Voter Roll. Please check your Voter ID card.`
+      });
+    }
+
+    const doc = result.doc;
+    const colName = result.colName || '';
+    const voter = {
+      epic_no:     doc.EPIC_NO,
+      name:        doc.VOTER_NAME,
+      district:    doc.DISTRICT,
+      assembly_no: doc.ASSEMBLY_NO || colName.replace('ass_', ''),
+      assembly:    doc.ASSEMBLY_NAME || `Assembly ${doc.ASSEMBLY_NO}`,
+      part_no:     doc.PART_NO || '1',
+      gender:      doc.GENDER || 'Unspecified',
+      age:         doc.AGE || 35
+    };
+
+    // Update user — voter DB data is final once EPIC is verified
+    user.epicNo      = voter.epic_no;
+    user.voterName   = voter.name;
+    user.district    = voter.district;
+    user.assemblyName = voter.assembly;
+    user.boothNo     = String(voter.part_no || '1');
+    user.gender      = voter.gender;
+    await user.save();
+
+    // Cascade update to all scheme applications
+    await SchemeApplication.updateMany(
+      { userId: user._id },
+      { $set: {
+        epicNo:       voter.epic_no,
+        voterName:    voter.name,
+        district:     voter.district,
+        assemblyName: voter.assembly,
+        boothNo:      String(voter.part_no || '1')
+      }}
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Voter ID verified and profile updated successfully!',
+      voter,
+      user
+    });
+  } catch (error) {
+    console.error('[updateEpic Error]:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   sendOtp,
   verifyOtp,
@@ -520,5 +621,6 @@ module.exports = {
   registerSchemes,
   getReferralLink,
   getMyMembers,
-  getMemberStatus
+  getMemberStatus,
+  updateEpic
 };

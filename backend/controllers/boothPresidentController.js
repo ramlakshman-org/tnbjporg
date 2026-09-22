@@ -1,6 +1,12 @@
 const BoothPresidentRequest = require('../models/BoothPresidentRequest');
 const User = require('../models/User');
+const OtpSession = require('../models/OtpSession');
+const IncompleteRegistration = require('../models/IncompleteRegistration');
+const jwt = require('jsonwebtoken');
 const { getAssemblyMetadata } = require('../services/jurisdictionService');
+
+const generateVolunteerToken = (id, tokenVersion = 1) =>
+  jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
 // @desc    Apply to be a Volunteer
 // @route   POST /api/booth-president/apply
@@ -248,10 +254,139 @@ const handleBoothPresidentAction = async (req, res) => {
   }
 };
 
+// @desc    Direct volunteer registration (no login required — OTP session auth)
+// @route   POST /api/booth-president/volunteer-register
+const volunteerRegister = async (req, res) => {
+  try {
+    const {
+      mobile, epicNo, epic_no, voterName, name,
+      district, assemblyName, assembly, boothNo, part_no, gender, assemblyNo
+    } = req.body;
+
+    const cleanMobile = (mobile || '').trim();
+    const cleanEpic = ((epicNo || epic_no || '').trim()).toUpperCase();
+    const cleanName = (voterName || name || '').trim();
+    const cleanDistrict = (district || '').trim();
+    const cleanAss = (assemblyName || assembly || '').trim();
+    const cleanBooth = (boothNo || part_no || '').toString().trim();
+    const cleanAssNo = (assemblyNo || '').toString().trim();
+
+    if (!cleanMobile) {
+      return res.status(400).json({ success: false, message: 'Mobile number is required' });
+    }
+
+    // Auth: accept existing user JWT or a fresh verified OTP session
+    const authHeader = req.headers.authorization || '';
+    let tokenUser = null;
+    if (authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+        tokenUser = await User.findById(decoded.id);
+      } catch (_) {}
+    }
+    if (!tokenUser) {
+      const verifiedSession = await OtpSession.findOne({ mobile: cleanMobile, verified: true });
+      if (!verifiedSession) {
+        return res.status(401).json({ success: false, message: 'Please verify your mobile number via OTP first.' });
+      }
+    }
+
+    // Find or create User record
+    let user = tokenUser || (await User.findOne({ mobile: cleanMobile }));
+
+    if (!user) {
+      let ntCode;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = 'NT-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        const exists = await User.exists({ referralCode: candidate });
+        if (!exists) { ntCode = candidate; break; }
+      }
+      if (!ntCode) throw new Error('Failed to generate unique referral code');
+
+      user = await User.create({
+        mobile: cleanMobile,
+        epicNo: cleanEpic || ('PND-' + cleanMobile),
+        voterName: cleanName || 'Volunteer',
+        district: cleanDistrict || 'Tamil Nadu',
+        assemblyName: cleanAss || 'Assembly',
+        boothNo: cleanBooth || '0',
+        gender: gender || 'Unspecified',
+        assemblyNo: cleanAssNo,
+        referralCode: ntCode,
+        referredBy: null
+      });
+    }
+
+    // Create or update BoothPresidentRequest
+    let request = await BoothPresidentRequest.findOne({ userId: user._id });
+
+    if (request) {
+      if (request.status === 'Approved') {
+        return res.status(400).json({ success: false, message: 'You are already an approved volunteer.', request });
+      }
+      request.type = 'volunteer';
+      request.voterName = user.voterName;
+      request.epicNo = user.epicNo;
+      request.mobile = user.mobile;
+      request.gender = user.gender || 'Unspecified';
+      request.district = user.district || '';
+      request.assemblyName = user.assemblyName || '';
+      request.assemblyNo = user.assemblyNo || '';
+      request.boothNo = '';
+      request.isCustomBooth = false;
+      request.status = 'Pending';
+      request.rejectionReason = '';
+      request.appliedAt = new Date();
+      request.actionDate = null;
+      request.actionBy = '';
+      await request.save();
+    } else {
+      request = await BoothPresidentRequest.create({
+        type: 'volunteer',
+        userId: user._id,
+        voterName: user.voterName,
+        epicNo: user.epicNo,
+        mobile: user.mobile,
+        gender: user.gender || 'Unspecified',
+        district: user.district || '',
+        assemblyName: user.assemblyName || '',
+        assemblyNo: user.assemblyNo || '',
+        boothNo: '',
+        isCustomBooth: false,
+        status: 'Pending',
+        appliedAt: new Date()
+      });
+    }
+
+    // Cleanup incomplete registration record (fire-and-forget)
+    IncompleteRegistration.deleteOne({ mobile: cleanMobile }).catch(() => {});
+
+    const token = generateVolunteerToken(user._id, user.tokenVersion || 1);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Volunteer application submitted successfully!',
+      token,
+      user: {
+        _id: user._id,
+        voterName: user.voterName,
+        epicNo: user.epicNo,
+        mobile: user.mobile,
+        referralCode: user.referralCode
+      },
+      request
+    });
+  } catch (error) {
+    console.error('[volunteerRegister Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit volunteer application' });
+  }
+};
+
 module.exports = {
   applyBoothPresident,
   getMyBoothPresidentStatus,
   getPublicJurisdictions,
   getAdminBoothPresidentRequests,
-  handleBoothPresidentAction
+  handleBoothPresidentAction,
+  volunteerRegister
 };

@@ -22,6 +22,7 @@ const {
   getCoverage,
   deleteMember,
   getSchemeSuggestions,
+  getIncompleteRegistrations,
 } = require('../controllers/adminController');
 const {
   getAllSchemesAdmin,
@@ -54,6 +55,9 @@ router.put('/applications/:id/status', protectAdmin, updateApplicationStatus);
 router.put('/applications/bulk-status', protectAdmin, bulkUpdateApplicationStatus);
 router.post('/create-credential', protectAdmin, authorizeRoles('SUPER_ADMIN'), createAdminCredential);
 router.get('/credentials', protectAdmin, authorizeRoles('SUPER_ADMIN'), getAllAdmins);
+
+// ── Incomplete registrations (SUPER_ADMIN and STATE_ADMIN) ──
+router.get('/incomplete-registrations', protectAdmin, authorizeRoles('SUPER_ADMIN', 'STATE_ADMIN'), getIncompleteRegistrations);
 
 // ── Member management (SUPER_ADMIN only) ──
 router.delete('/members/:userId', protectAdmin, authorizeRoles('SUPER_ADMIN'), deleteMember);

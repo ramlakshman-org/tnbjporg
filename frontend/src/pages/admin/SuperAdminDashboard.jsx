@@ -17,6 +17,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import BoothPresidentRequestsView from '../../components/BoothPresidentRequestsView';
 import SchemesManagementView from '../../components/SchemesManagementView';
 import FlowImagesView from '../../components/FlowImagesView';
+import IncompleteRegistrationsView from '../../components/IncompleteRegistrationsView';
 import TnDistrictMap from '../../components/TnDistrictMap';
 
 
@@ -1493,6 +1494,10 @@ const SuperAdminDashboard = () => {
           initialStatus={statusFilter}
           initialScheme={schemeFilter}
         />
+      )}
+
+      {subPage === 'incomplete_registrations' && (
+        <IncompleteRegistrationsView />
       )}
 
       {subPage === 'schemes' && (

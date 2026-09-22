@@ -194,6 +194,10 @@ function statusLabel(s, l) {
 
 /* ───────── HTTP handler ───────── */
 router.post('/', async (req, res) => {
+  // Flow endpoint temporarily disabled — RSA key needs re-sync with Meta dashboard.
+  // To re-enable: remove these 2 lines and regenerate the key pair (TASK-22).
+  return res.status(200).json({ version: '3', data: { error_msg: 'Flow service is temporarily unavailable. Please try again later.' } });
+
   let aesKeyBuffer, ivBuffer, decryptedBody;
   try {
     ({ decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body));
