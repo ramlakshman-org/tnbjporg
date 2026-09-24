@@ -6,6 +6,7 @@ const User = require('../models/User');
 const SchemeApplication = require('../models/SchemeApplication');
 const SchemeSuggestion = require('../models/SchemeSuggestion');
 const IncompleteRegistration = require('../models/IncompleteRegistration');
+const BoothPresidentRequest = require('../models/BoothPresidentRequest');
 const { BJP_SCHEMES } = require('../constants/schemes');
 
 // Resolve a stored schemeName (often the numeric scheme id, since the chatbot
@@ -252,14 +253,17 @@ const getDashboardStats = async (req, res) => {
     const scopeQuery = getAdminScopeQuery(admin);
 
     // Count from WRITE DB: unique enrolled members with scheme applications
-    const [totalApplications, distinctMobileCount, totalRegisteredUsers] = await Promise.all([
+    const [totalApplications, distinctMobileCount, totalRegisteredUsers, pendingVolunteers, totalVolunteers, totalIncomplete] = await Promise.all([
       SchemeApplication.countDocuments(scopeQuery),
       SchemeApplication.aggregate([
         { $match: scopeQuery },
         { $group: { _id: '$mobile' } },
         { $count: 'total' }
       ], { allowDiskUse: true }).then(r => r[0]?.total || 0),
-      User.countDocuments(scopeQuery)
+      User.countDocuments(scopeQuery),
+      BoothPresidentRequest.countDocuments({ ...scopeQuery, status: 'Pending' }),
+      BoothPresidentRequest.countDocuments(scopeQuery),
+      IncompleteRegistration.countDocuments({})
     ]);
     const totalVotersRequested = distinctMobileCount || totalApplications;
 
@@ -566,7 +570,10 @@ const getDashboardStats = async (req, res) => {
         totalRegisteredUsers,
         totalVotersInRoll,
         totalApplications,
-        statusBreakdown: statusMap
+        statusBreakdown: statusMap,
+        pendingVolunteers,
+        totalVolunteers,
+        totalIncomplete
       },
       districtStats,
       assemblyStats,

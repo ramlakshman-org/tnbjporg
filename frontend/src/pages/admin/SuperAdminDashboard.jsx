@@ -579,6 +579,66 @@ const SuperAdminDashboard = () => {
             </div>
             </ErrorBoundary>
 
+            {/* ── Action Required ── */}
+            {admin?.role !== 'BOOTH_ADMIN' && (
+            <ErrorBoundary inline>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', margin: '24px 0' }}>
+
+                {/* Volunteer Requests card */}
+                <div
+                  className="stat-card"
+                  onClick={() => navigateSubPage('booth_presidents')}
+                  style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', padding: '20px' }}
+                  title="Click to manage volunteer requests"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                    <div className="stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}>
+                      <Shield size={20} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="stat-label" style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Volunteer Requests</div>
+                      <div style={{ display: 'flex', gap: '16px', marginTop: '4px', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a' }}>
+                          {statsData.overview?.totalVolunteers ?? 0}
+                        </span>
+                        {(statsData.overview?.pendingVolunteers ?? 0) > 0 && (
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#ea580c', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '2px 10px' }}>
+                            {statsData.overview.pendingVolunteers} Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="stat-sub" style={{ color: 'var(--color-electric-blue)', fontWeight: '500' }}>Click to Review Requests →</div>
+                </div>
+
+                {/* Incomplete Enquiries card — SUPER/STATE only */}
+                {(admin?.role === 'SUPER_ADMIN' || admin?.role === 'STATE_ADMIN') && (
+                  <div
+                    className="stat-card"
+                    onClick={() => navigateSubPage('incomplete_registrations')}
+                    style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', padding: '20px' }}
+                    title="Click to view incomplete enquiries"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                      <div className="stat-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                        <FileText size={20} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div className="stat-label" style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>Incomplete Enquiries</div>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a', marginTop: '4px' }}>
+                          {statsData.overview?.totalIncomplete ?? 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="stat-sub" style={{ color: 'var(--color-electric-blue)', fontWeight: '500' }}>People who dropped off mid-registration →</div>
+                  </div>
+                )}
+
+              </div>
+            </ErrorBoundary>
+            )}
+
             <TnDistrictMap
               onSelectDistrict={(district) => {
                 if (district) {
