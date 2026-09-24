@@ -350,32 +350,52 @@ const BoothPresidentRequestsView = ({ admin = {} }) => {
                       )}
                     </td>
 
-                    {/* Actions — Super Admin only */}
+                    {/* Actions */}
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      {admin.role === 'SUPER_ADMIN' ? (
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                          {r.status !== 'Approved' && (
-                            <button
-                              onClick={() => handleAction(r._id, 'Approved')}
-                              disabled={processingId === r._id}
-                              style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        {r.mobile && (
+                          <>
+                            <a
+                              href={`tel:+91${r.mobile}`}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title={`Call ${r.mobile}`}
                             >
-                              <CheckCircle2 size={12} /> Approve
-                            </button>
-                          )}
-                          {r.status !== 'Rejected' && (
-                            <button
-                              onClick={() => { setRejectingItem(r); setRejectionReason(''); }}
-                              disabled={processingId === r._id}
-                              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              <Phone size={12} /> Call
+                            </a>
+                            <a
+                              href={`https://wa.me/91${r.mobile}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title={`WhatsApp ${r.mobile}`}
                             >
-                              <XCircle size={12} /> Reject
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '11px', color: '#cbd5e1' }}>View only</span>
-                      )}
+                              <Phone size={12} /> WA
+                            </a>
+                          </>
+                        )}
+                        {admin.role === 'SUPER_ADMIN' && (
+                          <>
+                            {r.status !== 'Approved' && (
+                              <button
+                                onClick={() => handleAction(r._id, 'Approved')}
+                                disabled={processingId === r._id}
+                                style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <CheckCircle2 size={12} /> Approve
+                              </button>
+                            )}
+                            {r.status !== 'Rejected' && (
+                              <button
+                                onClick={() => { setRejectingItem(r); setRejectionReason(''); }}
+                                disabled={processingId === r._id}
+                                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <XCircle size={12} /> Reject
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

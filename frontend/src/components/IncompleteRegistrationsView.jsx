@@ -161,7 +161,7 @@ const IncompleteRegistrationsView = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ background: '#f5f5f7', borderBottom: '1px solid #e5e5ea' }}>
-              {['#', 'Mobile', 'Stage', 'EPIC No.', 'Name', 'District', 'Assembly', 'Captured At'].map((h) => (
+              {['#', 'Mobile', 'Stage', 'EPIC No.', 'Name', 'District', 'Assembly', 'Captured At', 'Contact'].map((h) => (
                 <th key={h} style={{
                   padding: '10px 14px', textAlign: 'left',
                   fontWeight: '600', color: '#474747', whiteSpace: 'nowrap'
@@ -172,13 +172,13 @@ const IncompleteRegistrationsView = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
                   Loading…
                 </td>
               </tr>
             ) : records.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
                   No incomplete registrations found.
                 </td>
               </tr>
@@ -219,6 +219,28 @@ const IncompleteRegistrationsView = () => {
                   </td>
                   <td style={{ padding: '10px 14px', color: '#999', whiteSpace: 'nowrap' }}>
                     {formatDate(r.createdAt)}
+                  </td>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                    {r.mobile && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <a
+                          href={`tel:+91${r.mobile}`}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #d2d2d7', background: '#fff', color: '#1d1d1f', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title={`Call ${r.mobile}`}
+                        >
+                          📞 Call
+                        </a>
+                        <a
+                          href={`https://wa.me/91${r.mobile}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title={`WhatsApp ${r.mobile}`}
+                        >
+                          💬 WA
+                        </a>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

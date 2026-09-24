@@ -1,255 +1,264 @@
-# tnbjp.org — Fix Tasks
+# BJP Nalam Thittam — Task Planning
 
-**Source:** ISSUES.md (17 confirmed issues, reality-checked against live server 2026-09-19)
-**Rule:** One task at a time. Test after each. Never skip ahead.
-**Deploy path:** `/var/www/bjptn/backend/` on `168.144.219.177` · PM2 name: `bjptn-backend`
-
----
-
-## PHASE 1 — Stop the Bleeding
-> Zero-risk one-to-three line changes. Can be batched into one deploy.
-
-- [x] **TASK-01** · ISSUE-02 · Remove OTP from plaintext log
-  - File: `backend/services/smsService.js:22`
-  - Change: Replace full OTP + mobile log line with masked version
-  - Test: Send a test OTP, confirm PM2 log shows no OTP or full mobile number
-  - Deploy: `pm2 reload bjptn-backend`
-
-- [x] **TASK-02** · ISSUE-16 · Simplify `GET /` response
-  - File: `backend/server.js:140-167`
-  - Change: Return `{ status: 'ONLINE', version: '1.0.0' }` only
-  - Test: `curl https://tnbjp.org/` — confirm no DB names, no API map
-  - Deploy: included in Phase 1 batch
-
-- [x] **TASK-03** · ISSUE-06 · Rate limit `/api/check-mobile`
-  - File: `backend/server.js` (rate limiter section)
-  - Change: Add `checkMobileLimiter` (20 req / 10 min) and apply to `/api/check-mobile`
-  - Test: Hit the endpoint 21 times, confirm 429 on 21st
-  - Deploy: included in Phase 1 batch
-
-- [x] **TASK-04** · ISSUE-11 · Add `.lean()` to booth voter fetch
-  - File: `backend/controllers/adminController.js:1669`
-  - Change: Add `.lean()` to `SchemeApplication.find(...).select('epicNo status')`
-  - Test: Load booth voter roll in admin panel, confirm data still loads
-  - Deploy: included in Phase 1 batch
-
-- [x] **TASK-05** · ISSUE-14 · Invalidate stats cache after `deleteMember`
-  - File: `backend/controllers/adminController.js:2184`
-  - Change: Add `invalidateStatsCache()` after `User.findByIdAndDelete(userId)`
-  - Test: Delete a test member, confirm dashboard stats update immediately
-  - Deploy: included in Phase 1 batch
-
-- [x] **TASK-06** · ISSUE-12 · Reject empty schemes array in `registerSchemes`
-  - File: `backend/controllers/userChatController.js:359`
-  - Change: Replace default fallback array with a 400 error when no schemes provided
-  - Test: Call `/api/register-schemes` without schemes field, confirm 400 response
-  - Deploy: included in Phase 1 batch
+> Last updated: 2026-09-24
+> Server: 168.144.219.177 (DigitalOcean, Ubuntu)
+> App: bjptn-backend (4 PM2 cluster workers, port 5000)
+> Frontend: React 18 + Vite, served from /var/www/bjptn/dist
+> DB: MongoDB Atlas (bjp_nalam_thittam_db) + Local MongoDB (voter_db)
+> GitHub: https://github.com/ramlakshman-org/tnbjporg (remote: backup)
 
 ---
 
-## PHASE 2 — Functional Correctness
-> Each fix tested individually before moving to the next.
+## TASK-27 — Action Required Panel on Overview Dashboard
 
-- [x] **TASK-07** · ISSUE-05 · SMS gateway failure must return `success: false`
-  - File: `backend/services/smsService.js:36-52`
-  - Change: Both `catch` and non-success paths return `{ success: false, error: '...' }`; remove `devOtp` from return
-  - Test: Temporarily break the SMS API key, trigger OTP send, confirm controller receives `success: false` and logs the failure
-  - Deploy: `pm2 reload bjptn-backend`
+### Context
+The Overview Dashboard (`getDashboardStats` API + `SuperAdminDashboard.jsx`) currently shows 4 stat cards:
+Total Voters in Roll, Voters Enrolled in Schemes, Applications Submitted, Approved Directives.
 
-- [x] **TASK-08** · ISSUE-10 · Regex scope in CSV/Excel export baseline
-  - File: `backend/controllers/adminController.js:1203` and `:1307`
-  - Change: Replace exact-string baseline scope with case-insensitive regex for DISTRICT_ADMIN, ASSEMBLY_ADMIN, BOOTH_ADMIN
-  - Test: Download CSV as a DISTRICT_ADMIN, confirm row count matches dashboard count
-  - Deploy: `pm2 reload bjptn-backend`
+Two high-priority data points are missing from the dashboard:
+- **Volunteer Requests** — stored in `boothpresidentrequests` collection. Fields: status (Pending/Approved/Rejected), district, assemblyName, mobile, voterName, appliedAt.
+- **Incomplete Enquiries** — stored in `IncompleteRegistration` collection. Fields: mobile, stage (OTP_VERIFIED / EPIC_VERIFIED), epicNo, voterName, district, assemblyName, createdAt.
 
-- [x] **TASK-09** · ISSUE-13 · Align warm cache payload shape with `getDashboardStats` *(verified: payload already correct — false positive)*
-  - File: `backend/controllers/adminController.js:2125-2135`
-  - Change: Rewrite `warmStatsCache` payload to match the exact shape `getDashboardStats` returns (`overview`, `districtStats`, `assemblyStats`, etc.)
-  - Test: Restart PM2, load super admin dashboard within 30 seconds, confirm stats display correctly
-  - Deploy: `pm2 reload bjptn-backend`
+Currently admins must navigate to the sidebar tab to see these numbers. There is no at-a-glance count on the dashboard.
 
-- [x] **TASK-10** · ISSUE-03 · Scope check in `updateApplicationStatus`
-  - File: `backend/controllers/adminController.js:1048`
-  - Change: Replace `findById(id)` with `findOne({ _id: id, ...getAdminScopeQuery(req.admin) })`
-  - Test: As BOOTH_ADMIN, attempt to update an application outside your booth — confirm 404. Then update one inside your booth — confirm success.
-  - Deploy: `pm2 reload bjptn-backend`
+### What to build
+**Backend** (`backend/controllers/adminController.js` → `getDashboardStats`):
+- Add 2 parallel `countDocuments` calls inside the existing `Promise.all` block:
+  - `BoothPresidentRequest.countDocuments({ status: 'Pending', ...scopeQuery })` → `pendingVolunteers`
+  - `BoothPresidentRequest.countDocuments({ ...scopeQuery })` → `totalVolunteers`
+  - `IncompleteRegistration.countDocuments({})` → `totalIncomplete` (SUPER/STATE only; no scope filter needed)
+- Add these to the `overview` object in the response payload.
+- Cache is already 5 minutes (`STATS_TTL_MS`). No change needed there.
 
----
+**Frontend** (`frontend/src/pages/admin/SuperAdminDashboard.jsx`):
+- Add a new "Action Required" section below the existing 4-card grid and above the TN District Map.
+- Two wide cards side by side:
+  - **Volunteer Requests**: shows total count + pending count highlighted in orange. Click → navigates to `booth_presidents` tab.
+  - **Incomplete Enquiries**: shows total count + stage breakdown (OTP done vs EPIC found). Click → navigates to `incomplete_registrations` tab.
+- Only show Incomplete Enquiries card to SUPER_ADMIN and STATE_ADMIN (matches sidebar visibility).
+- District/Assembly admins see only the Volunteer Requests card.
 
-## PHASE 3 — Auth Hardening
-> Schema change. All existing admin sessions invalidated on deploy. Warn team before deploying.
+### Files to change
+| File | Change |
+|------|--------|
+| `backend/controllers/adminController.js` | Add 2 count queries inside getDashboardStats Promise.all (~line 295) |
+| `frontend/src/pages/admin/SuperAdminDashboard.jsx` | Add Action Required section after stat-cards-grid (~line 580) |
 
-- [x] **TASK-11** · ISSUE-01 + ISSUE-17 · Add `tokenVersion` to Admin model
-  - Files: `backend/models/Admin.js`, `backend/controllers/adminController.js:65` (login), `backend/middleware/authMiddleware.js:58`
-  - Changes:
-    1. Add `tokenVersion: { type: Number, default: 1 }` to `adminSchema`
-    2. In `adminLogin`: increment `admin.tokenVersion` and `await admin.save()` before `generateAdminToken`
-    3. `generateAdminToken` already reads `admin.tokenVersion || 1` — works automatically once field exists
-    4. `authMiddleware` check already written correctly — works automatically once field exists
-  - ⚠️ **All logged-in admins will need to re-login after this deploy**
-  - Test: Login as admin, copy JWT, logout, login again — old JWT must be rejected (401)
-  - Deploy: `pm2 reload bjptn-backend` · notify all admins before deploying
+### Risks
+- **Low**: Adding 2 `countDocuments` to an already cached endpoint. Cache TTL is 5 min so DB hit is minimal.
+- **Low**: Scope query for `BoothPresidentRequest` must match how it's done in `getAdminBoothPresidentRequests` — verify field names (district, assemblyName) match the collection.
+- **None**: Frontend-only UI change below the fold. Rollback = revert 1 JSX block.
 
----
+### Success looks like
+- Overview Dashboard loads and shows the new "Action Required" section.
+- Volunteer Requests card shows correct total and pending count (verify against Volunteer Requests tab count).
+- Clicking the card navigates directly to that tab.
+- Incomplete Enquiries card visible to Super/State Admin only.
+- No regression on existing 4 stat cards or the TN District Map below.
+- API response time unchanged (still served from 5-min cache after first hit).
 
-## PHASE 4 — Performance
-> No urgency today. Fix before data grows large.
+### Failure looks like
+- Dashboard shows 0/0 for new cards when real data exists → scope query mismatch.
+- Existing 4 stat cards break → syntax error in getDashboardStats payload block.
+- Cards visible to District/Assembly admins who shouldn't see Incomplete Enquiries.
 
-- [ ] **TASK-12** · ISSUE-04 · Excel export — stream via cursor instead of loading all docs
-  - File: `backend/controllers/adminController.js:1455`
-  - Change: Replace `SchemeApplication.find(...).lean()` with `.lean().cursor()` and `for await`; match existing CSV export pattern
-  - Test: Export Excel as SUPER_ADMIN with no filters, confirm file generates correctly and PM2 memory stays flat
-  - Deploy: `pm2 reload bjptn-backend`
+### Fallback
+- If backend change causes issues: remove the 2 new count queries and hardcode `pendingVolunteers: null` in payload → frontend hides card when value is null.
+- If frontend card breaks layout: wrap in `ErrorBoundary` (already used throughout dashboard).
 
-- [x] **TASK-13** · ISSUE-09 · Replace `distinct('mobile')` with aggregate count
-  - File: `backend/controllers/adminController.js:747`
-  - Change: Replace `SchemeApplication.distinct('mobile', filter)` with an `$aggregate` `$group` + `$count` pipeline
-  - Test: Load admin applications list, confirm pagination total is correct
-  - Deploy: `pm2 reload bjptn-backend`
-
----
-
-## PHASE 5 — Infrastructure
-> Nginx config changes. Requires `nginx -t` before reload.
-
-- [ ] **TASK-14** · ISSUE-15 · Remove `unsafe-eval` from nginx CSP
-  - File: Live nginx config at `/etc/nginx/sites-enabled/bjptn.conf` (and update `bjptn_nginx.conf` in repo)
-  - Change: Remove `'unsafe-eval'` from all 4 location block CSP headers
-  - Test: `nginx -t` passes. Load site, check browser console for CSP violations
-  - Deploy: `nginx -s reload`
-
-- [x] **TASK-15** · ISSUE-08 · Remove `boothPresidentRoutes` dual mount
-  - File: `backend/server.js:175`
-  - Change: Remove `app.use('/api/admin', boothPresidentRoutes)` line; move admin-facing endpoints into `adminRoutes.js`
-  - Test: All existing `/api/booth-president/*` routes still work; confirm `/api/admin/jurisdictions` no longer responds
-  - Deploy: `pm2 reload bjptn-backend`
+### How to test
+1. Login as Super Admin → Overview Dashboard → verify "Action Required" section appears.
+2. Cross-check Volunteer Requests card number vs. Volunteer Requests tab → must match.
+3. Click Volunteer Requests card → should navigate to `booth_presidents` tab.
+4. Login as District Admin → verify Incomplete Enquiries card is NOT shown.
+5. Check API: `curl http://localhost:5000/api/admin/dashboard-stats -H "Authorization: Bearer <token>"` → response should include `overview.pendingVolunteers` and `overview.totalIncomplete`.
+6. Hit `?live=1` to bypass cache and confirm fresh counts.
 
 ---
 
-## PHASE 6 — Design Decision Required
-> Needs Ram's input on auth flow before implementation.
+## TASK-28 — Export Report on Volunteer Requests Page
 
-- [ ] **TASK-16** · ISSUE-07 · Auth on `/api/voter/search-epic` and `/api/validate-epic`
-  - **Decision needed:** What level of auth should be required?
-    - Option A: Require a verified OTP session (user has completed OTP flow but not necessarily registered)
-    - Option B: Require a valid user JWT (user must be a registered member)
-    - Option C: Keep unauthenticated but add tighter rate limit (20/10min instead of 30)
-  - Once Ram decides: update `voterRoutes.js` and `userChatRoutes.js` accordingly
-  - Test: Confirm chatbot flow still works end-to-end after adding auth
-  - Deploy: `pm2 reload bjptn-backend`
+### Context
+The Volunteer Requests page (`frontend/src/components/BoothPresidentRequestsView.jsx`) already has:
+- District filter dropdown
+- Assembly filter dropdown (scoped to selected district)
+- Status filter (Pending/Approved/Rejected)
+- Search box
+- Pagination (15 per page)
 
----
+**What's missing:** No way to download/export filtered results. Admins need to share district-wise or assembly-wise volunteer lists as a report.
 
----
+Export infrastructure already exists in the codebase:
+- `exportApplicationsCsv` (line 1204 of adminController.js) — streams CSV with UTF-8 BOM
+- `exportApplicationsExcel` (line 1302) — ExcelJS styled Excel file
+- Both follow the same filter pattern: read scope from admin JWT + query params
 
-## PHASE 7 — New Issues (Comprehensive Re-Audit 2026-09-21)
+The `boothpresidentrequests` collection has all needed fields:
+`voterName, epicNo, mobile, gender, district, assemblyName, boothNo, status, rejectionReason, appliedAt, actionDate, actionBy`
 
-- [x] **TASK-17** · NEW-01 · HIGH · npm dependency vulnerabilities
-  - `brace-expansion` DoS (GHSA-rgw5-rvv9-x895), `qs` + `body-parser` + `express` moderate DoS, `uuid` via `exceljs` moderate
-  - Total: 1 high, 5 moderate
-  - Fix: `cd /var/www/bjptn/backend && npm audit fix` (non-breaking fixes only)
-  - The uuid/exceljs fix requires `--force` (downgrades exceljs to 3.4.0 — breaking) — defer separately
-  - Test: `npm audit` shows 0 high after fix
-  - Deploy: `pm2 reload bjptn-backend`
+### What to build
+**Backend** (`backend/controllers/adminController.js`):
+- New function `exportVolunteerRequestsExcel` following same pattern as `exportApplicationsExcel`.
+- Accepts query params: `status`, `district`, `assemblyName` (matches existing filter API).
+- Respects admin scope (District Admin sees only their district, Assembly Admin sees only their assembly).
+- Output: styled Excel with columns: Name, EPIC No, Mobile, Gender, District, Assembly, Booth, Status, Applied Date, Action Date, Action By, Rejection Reason.
 
-- [x] **TASK-18** · NEW-02 · MEDIUM · 43 stale JS bundles in /dist/assets (81MB)
-  - Each deploy adds new versioned bundles, old ones never deleted
-  - Only the bundle referenced in current `index.html` is needed
-  - Fix: Parse `index.html` for referenced filenames, delete everything else in `/dist/assets`
-  - Test: Site loads correctly after cleanup
-  - Deploy: Static files only — no PM2 reload needed
+**Backend** (`backend/routes/adminRoutes.js`):
+- Add route: `GET /api/admin/export-volunteer-requests` → `exportVolunteerRequestsExcel`
 
-- [x] **TASK-19** · NEW-03 · MEDIUM · No PM2 log rotation configured
-  - `bjptn-backend-error.log` already 1.7MB (waFlow errors), `edm-backend-out.log` 3.2MB
-  - PM2 logs grow unbounded — will eventually fill disk
-  - Fix: `pm2 install pm2-logrotate` then configure max size 10MB, retain 7 days
-  - Test: `pm2 conf pm2-logrotate` shows settings applied
-  - Deploy: No PM2 reload needed
+**Frontend** (`frontend/src/components/BoothPresidentRequestsView.jsx`):
+- Add "⬇ Export Report" button next to the Refresh button in the header.
+- On click: build URL with current active filters (`status`, `district`, `assemblyName`) + auth token → trigger file download.
+- Show loading state on button while download in progress.
+- Reuse same download trigger pattern as existing export in SuperAdminDashboard.
 
-- [x] **TASK-20** · NEW-04 · LOW · .env probe requests return HTTP 200 (should be 404)
-  - Nginx `try_files` falls back to `index.html` for missing paths — so `/.env`, `/.env.backup` etc. return 200 with SPA HTML
-  - Not a real data leak but misleads security scanners and masks detection
-  - Fix: Add nginx rule to return 404 for `/.env*` paths before the `try_files` block
-  - Test: `curl https://tnbjp.org/.env` returns HTTP 404
-  - Deploy: `nginx -t && nginx -s reload`
+### Files to change
+| File | Change |
+|------|--------|
+| `backend/controllers/adminController.js` | Add `exportVolunteerRequestsExcel` function |
+| `backend/routes/adminRoutes.js` | Add GET route for export |
+| `frontend/src/components/BoothPresidentRequestsView.jsx` | Add Export button + download handler |
 
-- [x] **TASK-21** · NEW-05 · LOW · Backup files accessible from web
-  - `/index.html.bak` and `/assets/index-C1RDVctI-v2.js.bak` return HTTP 200
-  - Fix: Delete `.bak` files from `/var/www/bjptn/dist/`
-  - Test: `curl https://tnbjp.org/index.html.bak` returns 404
-  - Deploy: Static files only
+### Risks
+- **Low**: ExcelJS is already installed (`require('exceljs')` at line 1 of adminController.js). No new dependency.
+- **Low**: Large exports (if all 234 assemblies × many volunteers). Mitigate: add `limit: 5000` cap server-side with a warning in the file if truncated.
+- **Low**: Auth token must be sent as query param or header for file download (browser `<a href>` can't send headers). Use same pattern as existing export — token in query string, validated server-side.
 
-- [ ] **TASK-22** · NEW-06 · LOW · waFlow RSA error log growing unbounded
-  - `[waFlow] decrypt failed` floods error log (~70 errors per 1000 access log entries)
-  - Combined with no log rotation (TASK-19), this will eventually fill disk
-  - Depends on: TASK-19 (log rotation) mitigates urgency
-  - Fix options: (A) Fix RSA key — requires Meta Flow config update; (B) Suppress log noise with a counter instead of per-request error
-  - Note: Intentionally deferred in original audit — do NOT fix unless Ram explicitly asks
+### Success looks like
+- "⬇ Export Report" button appears in Volunteer Requests page header.
+- Clicking with no filters downloads all volunteer requests as Excel.
+- Filtering by Chennai district + specific assembly → export contains only those records.
+- Downloaded file opens correctly in Excel/Google Sheets with Tamil names rendering properly (UTF-8).
+- File name format: `Volunteer_Requests_Chennai_2026-09-24.xlsx`
+- Admins with District scope can only export their district's data (server enforces scope).
 
-- [x] **TASK-23** · NEW-07 · INFO · GeoJSON files publicly accessible
-  - `tn-assemblies.geojson` (1.4MB) and `tn-districts.geojson` (255KB) served with no auth or cache header
-  - Likely intentional for map feature — content is public TN geographic data, not sensitive
-  - Improvement: Add long-lived cache header (`Cache-Control: public, max-age=604800`) to reduce bandwidth on repeat loads
-  - Deploy: nginx config change + `nginx -s reload`
+### Failure looks like
+- Export returns 0 rows when data exists → scope query mismatch.
+- Tamil names garbled in Excel → encoding issue (fix: ensure ExcelJS uses UTF-8, not latin1).
+- Auth token rejected on export route → check token param name matches middleware expectation.
+- Button triggers download but file is corrupted → ExcelJS stream error; check server logs.
 
----
+### Fallback
+- If server-side export has issues: switch to client-side CSV export (generate from currently loaded page data using `URL.createObjectURL`). Covers current page only but works instantly with no backend change.
 
-## PHASE 8 — Analytics & Reporting Enhancement
-
-- [x] **TASK-24** · FEAT-01 · Analytics & Reports — Deploy current Analytics tab build
-  - Frontend: `ReportsView.jsx` — tab switcher (Report Data | Analytics), TrendsChart, SchemePieChart, district table, assembly table, incomplete registrations summary
-  - Built 2026-09-22. Deployed 2026-09-22.
-  - Deploy: `scp assets/index-CxpqVX-6-v2.js` → `/var/www/bjptn/dist/assets/` then `scp index.html` → `/var/www/bjptn/dist/`
-  - Note: tasks.md had wrong path (`/var/www/bjptn/frontend/dist/` — does not exist). Correct path is `/var/www/bjptn/dist/`
-
-- [x] **TASK-25** · FEAT-02 · Separate Analytics Exports — 5 focused Excel downloads
-
-- [x] **TASK-26** · FEAT-03 · Optional EPIC Registration — District & Assembly fallback + Add EPIC Later
-  - **Flow:** At EPIC step, user can toggle "Don't have Voter ID?" → enters Name + District + Assembly instead
-  - **Backend:** `epicNo` stored as `PND-{mobile}` when no EPIC given. New `PATCH /api/update-epic` endpoint (protectUser) verifies EPIC against voter DB and cascades update to User + all SchemeApplications
-  - **Frontend:** Toggle in `ChatbotPage.jsx` (AWAIT_EPIC state) + `VolunteerRegistrationPage.jsx` (Step 3). On next login, if `epicPending: true` returned, inline EPIC prompt shown on member card screen
-  - **Data:** `src/data/tn-locations.json` — 38 districts × 234 assemblies from existing geojson
-  - Bundle: `index-CrRzdcfE-v2.js`
-  - **Backend:** New function `exportAnalyticsExcel` in `adminController.js` + new route `GET /api/admin/export-analytics?type=...`
-    - `type=datewise` → Sheet: Date / Registrations (last N days, configurable via `?days=14|30|90`)
-    - `type=districtwise` → Sheet: District / Total / Approved / Pending / Rejected / Share %
-    - `type=schemewise` → Sheet: Scheme Name / Full Title / Total / Share % (all 23 schemes)
-    - `type=assemblywise` → Sheet: Assembly / District / Total / Approved / Pending / Rejected
-    - `type=incomplete` → Sheet: Full incomplete registrations list (Mobile / Stage / EPIC / Name / District / Assembly / Captured Date)
-  - **Frontend:** Each Analytics tab section gets its own `↓ Export` button
-  - Reuses data already computed by `getTrends`, `getDashboardStats`, `getIncompleteRegistrations` — no new DB queries
-  - Test: Each export type generates correct Excel with title block, header row, data rows
-  - Deploy: Backend `scp` + `pm2 reload bjptn-backend` · Frontend `scp dist/`
+### How to test
+1. Go to Volunteer Requests tab as Super Admin.
+2. Click Export with no filters → file downloads, open in Excel, verify row count matches "Total Applications" stat card.
+3. Filter by a specific district → export → verify only that district's records are in file.
+4. Filter by Status = Pending → export → verify all rows have status Pending.
+5. Login as District Admin → export → verify file contains only their district.
+6. Check server: `pm2 logs bjptn-backend --lines 20` → should show export request logged, no errors.
 
 ---
 
-## Progress Tracker
+## TASK-29 ✅ COMPLETED 2026-09-24 — WhatsApp & Call Buttons on Volunteer Requests + Incomplete Enquiries
 
-| Task | Issue | Severity | Status | Found | Fixed Date |
-|------|-------|----------|--------|-------|------------|
-| TASK-01 | ISSUE-02 | CRITICAL | ✅ Done | Audit 1 | 2026-09-19 |
-| TASK-02 | ISSUE-16 | LOW | ✅ Done | Audit 1 | 2026-09-19 |
-| TASK-03 | ISSUE-06 | HIGH | ✅ Done | Audit 1 | 2026-09-19 |
-| TASK-04 | ISSUE-11 | MEDIUM | ✅ Done | Audit 1 | 2026-09-19 |
-| TASK-05 | ISSUE-14 | MEDIUM | ✅ Done | Audit 1 | 2026-09-19 |
-| TASK-06 | ISSUE-12 | MEDIUM | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-07 | ISSUE-05 | HIGH | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-08 | ISSUE-10 | MEDIUM | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-09 | ISSUE-13 | MEDIUM | ✅ Done | Audit 1 | False positive |
-| TASK-10 | ISSUE-03 | CRITICAL | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-11 | ISSUE-01+17 | CRITICAL | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-12 | ISSUE-04 | CRITICAL | ⏸ Deferred | Audit 1 | — |
-| TASK-13 | ISSUE-09 | HIGH | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-14 | ISSUE-15 | LOW | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-15 | ISSUE-08 | MEDIUM | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-16 | ISSUE-07 | HIGH | ✅ Done | Audit 1 | 2026-09-21 |
-| TASK-17 | NEW-01 | HIGH | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-18 | NEW-02 | MEDIUM | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-19 | NEW-03 | MEDIUM | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-20 | NEW-04 | LOW | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-21 | NEW-05 | LOW | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-22 | NEW-06 | LOW | Deferred | Audit 2 | — |
-| TASK-23 | NEW-07 | INFO | ✅ Done | Audit 2 | 2026-09-21 |
-| TASK-24 | FEAT-01 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |
-| TASK-25 | FEAT-02 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |
-| TASK-26 | FEAT-03 | MEDIUM | ✅ Done | 2026-09-22 | 2026-09-22 |
+### Context
+**Volunteer Requests** (`BoothPresidentRequestsView.jsx`): Each row has `mobile` field from `boothpresidentrequests`. Currently shows Name, EPIC, District, Assembly, Status, and Approve/Reject action buttons. No way to contact the person directly from the admin panel.
+
+**Incomplete Enquiries** (`IncompleteRegistrationsView.jsx`): Each row has `mobile` field from `IncompleteRegistration`. Currently shows Mobile (masked), Stage, District, Assembly, Name (if EPIC verified), Date. No contact buttons.
+
+The use case: Admin sees a Pending volunteer request or an incomplete registration and wants to follow up immediately via WhatsApp or phone — without copying the number manually.
+
+Both collections store mobile as a 10-digit Indian number (no country code prefix).
+
+### What to build
+**Frontend only** — no backend changes needed.
+
+**BoothPresidentRequestsView.jsx** — on each request row/card:
+- Add `📞 Call` button → `<a href="tel:+91{mobile}">` (opens dialer on mobile, prompts on desktop)
+- Add `💬 WhatsApp` button → `<a href="https://wa.me/91{mobile}" target="_blank">` (opens WhatsApp)
+- Place these buttons alongside the existing Approve/Reject buttons.
+- Style: small, outlined, consistent with existing action button style in the file.
+
+**IncompleteRegistrationsView.jsx** — on each record row:
+- Same two buttons: Call + WhatsApp using the `mobile` field.
+- Note: `maskMobile` function currently exists (line 15) but returns the full number string (no actual masking). Buttons should use the raw `mobile` value.
+- Place at the right end of each row.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/components/BoothPresidentRequestsView.jsx` | Add Call + WhatsApp anchor buttons per row |
+| `frontend/src/components/IncompleteRegistrationsView.jsx` | Add Call + WhatsApp anchor buttons per row |
+
+### Risks
+- **None**: Pure anchor tags, no state change, no API call, no backend touch.
+- **Low UX**: On desktop, `tel:` opens OS default dialer (may prompt or do nothing). Acceptable — primary users are on mobile.
+- **Low**: WhatsApp opens `wa.me` which requires the user to have WhatsApp installed. Fallback: wa.me handles this gracefully (shows install prompt).
+
+### Success looks like
+- Every row in Volunteer Requests shows a Call button and a WhatsApp button.
+- Every row in Incomplete Enquiries shows the same.
+- On mobile: tapping Call opens dialer with the number pre-filled.
+- On mobile: tapping WhatsApp opens a WhatsApp chat with the person.
+- No layout break on smaller screens (buttons wrap gracefully or are icon-only on mobile).
+- Existing Approve/Reject buttons on Volunteer Requests rows are unaffected.
+
+### Failure looks like
+- `mobile` field is undefined on some rows → button shows `wa.me/91undefined`. Fix: guard with `{mobile && <a href=...>}`.
+- Layout breaks on mobile with 4 buttons in one row → use icon-only buttons (phone icon, WhatsApp icon) with tooltip on mobile.
+
+### Fallback
+- If layout is too crowded: show buttons only on row expand/click (accordion pattern). No backend change.
+
+### How to test
+1. Open Volunteer Requests tab → verify Call and WhatsApp buttons appear on each row.
+2. On mobile (or Chrome DevTools mobile emulation): tap Call button → dialer opens with correct number.
+3. Tap WhatsApp button → WhatsApp opens (app or web) with that number pre-loaded.
+4. Open Incomplete Enquiries tab → verify same buttons appear.
+5. Check edge case: a row where mobile might be missing → button should not render (not crash).
+6. Verify Approve/Reject buttons still work after the change.
+
+---
+
+## Deploy Plan (all 3 tasks)
+
+### Order of implementation
+1. **TASK-29 first** (smallest, no backend, instant value — 30 min)
+2. **TASK-27** (backend + frontend, medium — 2h)
+3. **TASK-28** (backend + frontend, largest — 2h)
+
+### Deploy steps (each task)
+```bash
+# 1. Build frontend
+cd /path/to/frontend && npm run build
+
+# 2. Backup current dist on server
+ssh root@168.144.219.177 "cp -r /var/www/bjptn/dist /var/www/bjptn/dist_backup_TASKXX_YYYYMMDD"
+
+# 3. Upload assets first, index.html last
+scp -r dist/assets/. root@168.144.219.177:/var/www/bjptn/dist/assets/
+scp dist/index.html root@168.144.219.177:/var/www/bjptn/dist/index.html
+
+# 4. If backend changed: reload PM2 (graceful, no downtime)
+ssh root@168.144.219.177 "pm2 reload bjptn-backend"
+
+# 5. Verify
+ssh root@168.144.219.177 "curl -s http://localhost:5000/api/health && pm2 status --no-color"
+```
+
+### Rollback
+```bash
+# Restore previous dist
+ssh root@168.144.219.177 "rm -rf /var/www/bjptn/dist && cp -r /var/www/bjptn/dist_backup_TASKXX_YYYYMMDD /var/www/bjptn/dist"
+
+# If backend changed: restore file and reload
+scp backend/controllers/adminController.js root@168.144.219.177:/var/www/bjptn/backend/controllers/
+ssh root@168.144.219.177 "pm2 reload bjptn-backend"
+```
+
+---
+
+## Current Server State (as of 2026-09-24 06:58 UTC)
+- All 7 PM2 processes online
+- bjptn-backend: 4 cluster workers, 46h uptime, 23 restarts (all historical from TASK-25)
+- Error log: empty
+- CPU: 1.6% | RAM: 53% | Disk: 6%
+- Both DBs: CONNECTED
+- Frontend bundle: index-CAkT_oJ_-v2.js (deployed 2026-09-23, includes TASK-26 + double-start fix)
+- GitHub: ramlakshman-org/tnbjporg — up to date as of this session
+
+## Open Sentry Issues
+- **BJPTN-BACKEND-4**: N+1 on `GET /api/admin/dashboard-stats` (booth voter count cold cache). Deferred — not critical at current scale.
+- **BJPTN-BACKEND-6**: SyntaxError ghost from TASK-25 pm2 reload. PM2 error log is empty — this is historical noise in Sentry.
