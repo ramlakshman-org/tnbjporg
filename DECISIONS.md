@@ -22,6 +22,21 @@
 
 ---
 
+## 2026-09-23 — Fix: Double-start bug on WelcomeBannerMsg
+
+**Bug:** Tapping "தொடங்கு" (Start) multiple times sent duplicate user messages and produced a blank bot avatar. Root cause: `WelcomeBannerMsg` had no `disabled` prop and `handleStart` had no state guard — the button remained fully clickable after the chatbot moved past WELCOME state.
+
+**Fix (3 lines, `ChatbotPage.jsx`):**
+- `WelcomeBannerMsg`: added `disabled` prop, applied to button element
+- `handleStart`: added early-return guard `if (chatState !== S.WELCOME || isTyping) return`
+- `renderMsgContent` case `welcome_banner`: passes `disabled={chatState !== S.WELCOME}`
+
+**Also confirmed:** BJPTN-FRONTEND-1 (localStorage SecurityError) was already fixed in the Sep 22 build — `AuthContext` has `safeLS` wrapper. Sep 15 events were from old bundle `BX1`. Mark resolved in Sentry.
+
+**Deployed:** `index-CAkT_oJ_-v2.js`, Sep 23. Backup: `dist_backup_doublestart_20260923`. All 4 bjptn-backend workers online, both DBs connected, 0 new restarts.
+
+---
+
 ## 2026-09-22 — Comprehensive E2E Health Check
 
 **All systems healthy as of 09:35 UTC:**

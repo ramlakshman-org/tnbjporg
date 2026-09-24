@@ -383,22 +383,22 @@ function EpicPendingPrompt({ onVerify, loading }) {
 }
 
 // ── Message renderers ───────────────────────────────────────
-function WelcomeBannerMsg({ onStart }) {
+function WelcomeBannerMsg({ onStart, disabled }) {
   const { t } = useLang()
   return (
     <div className="welcome-banner">
-      <img 
-        src={FINAL_BANNER_URL} 
-        alt="BJP Tamil Nadu" 
+      <img
+        src={FINAL_BANNER_URL}
+        alt="BJP Tamil Nadu"
         className="banner-img"
         fetchpriority="high"
         decoding="sync"
-        onError={(e) => { e.target.style.display = 'none' }} 
+        onError={(e) => { e.target.style.display = 'none' }}
       />
       <div className="banner-content">
         <h2>{t("BJP Tamilnadu")}</h2>
         <p>{t("Initiative to register one lakh new beneficiaries in 25 Schemes")}</p>
-        <button className="btn-start" onClick={onStart}>
+        <button className="btn-start" onClick={onStart} disabled={disabled}>
           <i className="bi bi-play-circle-fill" /> {t('Start')}
         </button>
       </div>
@@ -4115,6 +4115,7 @@ export default function ChatbotPage() {
 
   // ── Flow handlers ─────────────────────────────────────────
   const handleStart = async () => {
+    if (chatState !== S.WELCOME || isTyping) return
     addMsg('user', 'text', { text: t('Start') })
     setChatState(S.AWAIT_MOBILE)
     await botSay(t('📱 Please enter your 10-digit mobile number to get started.'), 400)
@@ -4589,7 +4590,7 @@ export default function ChatbotPage() {
         return <span className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml }} />
       }
       case 'welcome_banner':
-        return <WelcomeBannerMsg onStart={handleStart} />
+        return <WelcomeBannerMsg onStart={handleStart} disabled={chatState !== S.WELCOME} />
       case 'location_form': {
         const isLatest = messages[messages.length - 1]?.id === msg.id
         return (
